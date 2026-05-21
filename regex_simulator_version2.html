@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>REGEX Simulator</title>
+<style>
+/* ── Reset & Base ────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:transparent;
+  --bg2:rgba(20,24,41,0.85);
+  --bg3:rgba(26,31,53,0.85);
+  --bg4:rgba(31,37,64,0.85);
+  --border:#252d4a;
+  --border2:#2e3860;
+  --text:#c8d0f0;
+  --text2:#7a87bb;
+  --text3:#4a5580;
+  --purple:#6c63ff;
+  --purple2:#8a83ff;
+  --purple-glow:rgba(108,99,255,.25);
+  --teal:#3ecfb8;
+  --teal-glow:rgba(62,207,184,.2);
+  --orange:#f5a623;
+  --orange-glow:rgba(245,166,35,.25);
+  --red:#e85555;
+  --green:#3ecf6e;
+  --green-glow:rgba(62,207,110,.2);
+  --r:8px;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+html{background:linear-gradient(-45deg, #0e1120, #141829, #1a1035, #0d1a2e);background-size:400% 400%;animation:gradientShift 12s ease infinite;min-height:100%}
+body{font-family:var(--font);background:transparent;color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.topbar{
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;
+}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.page-crumb{font-size:12px;color:var(--text3);letter-spacing:.04em;border-right:1px solid var(--border);padding-right:16px}
+.brand{font-size:18px;font-weight:700;color:#fff;letter-spacing:-.01em}
+.topbar-right{display:flex;gap:8px}
+.top-btn{
+  background:transparent;border:1px solid var(--border2);
+  color:var(--text);padding:7px 18px;border-radius:20px;
+  font-size:13px;cursor:pointer;font-family:var(--font);
+  transition:all .18s;
+}
+.top-btn:hover{background:var(--bg3);border-color:var(--purple)}
+.top-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
+
+/* ── Input row ───────────────────────────────────────────── */
+.input-row{
+  padding:14px 24px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.input-label{font-size:11px;color:var(--text2);letter-spacing:.06em;white-space:nowrap}
+.input-wrap{flex:1;position:relative}
+.string-input{
+  width:100%;background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);padding:9px 14px;border-radius:var(--r);
+  font-size:14px;font-family:var(--font);
+  outline:none;transition:border-color .2s;
+}
+.string-input::placeholder{color:var(--text3)}
+.string-input:focus{border-color:var(--purple)}
+.status-badge{
+  padding:8px 20px;border-radius:20px;font-size:13px;font-weight:600;
+  min-width:80px;text-align:center;cursor:default;user-select:none;
+  transition:all .25s;
+}
+.status-badge.idle{background:transparent;border:1px solid var(--border2);color:var(--text3)}
+.status-badge.valid{background:var(--green);color:#fff;box-shadow:0 0 16px var(--green-glow)}
+.status-badge.invalid{background:var(--red);color:#fff;box-shadow:0 0 16px rgba(232,85,85,.3)}
+.simulate-btn{
+  background:transparent;border:1px solid var(--purple2);
+  color:var(--purple2);padding:8px 22px;border-radius:20px;
+  font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);
+  transition:all .18s;
+}
+.simulate-btn:hover{background:var(--purple-glow)}
+
+/* ── Main layout ─────────────────────────────────────────── */
+.main{display:flex;height:calc(100vh - 115px);overflow:hidden}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar{
+  width:230px;min-width:230px;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  padding:18px 14px;
+  display:flex;flex-direction:column;gap:18px;
+  overflow-y:auto;
+}
+.sidebar-section-title{
+  font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px
+}
+.re-card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 12px;
+  font-size:11px;color:var(--text2);line-height:1.65;
+  cursor:pointer;transition:border-color .18s;
+}
+.re-card:hover{border-color:var(--border2)}
+.re-card.active{border-color:var(--purple);background:rgba(108,99,255,.08)}
+.re-card .re-label{
+  font-size:10px;font-weight:600;color:var(--text3);
+  letter-spacing:.08em;margin-bottom:5px
+}
+.re-card .re-formula{
+  font-family:'Courier New',monospace;font-size:10px;
+  color:var(--purple2);word-break:break-all;line-height:1.7
+}
+.sidebar-divider{border:none;border-top:1px solid var(--border);margin:2px 0}
+.fl-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+.fl-btn{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text2);padding:10px 14px;border-radius:var(--r);
+  font-size:13px;cursor:pointer;font-family:var(--font);
+  transition:all .18s;margin-bottom:6px;text-align:left;
+}
+.fl-btn .fl-main{font-weight:600;font-size:13px;color:var(--text)}
+.fl-btn .fl-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.fl-btn:hover{border-color:var(--border2);background:var(--bg4)}
+.fl-btn.active{
+  background:rgba(108,99,255,.15);
+  border-color:var(--purple);
+}
+.fl-btn.active .fl-main{color:var(--purple2)}
+
+/* ── Diagram panel ───────────────────────────────────────── */
+.diagram-panel{
+  flex:1;
+  background:transparent;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  position:relative;
+}
+.diagram-header{
+  padding:14px 22px;
+  display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+}
+.diagram-header span{font-size:14px;font-weight:500;color:var(--text2)}
+.diagram-badge{
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--purple2);padding:4px 16px;border-radius:6px;
+  font-size:13px;font-weight:600;letter-spacing:.04em;
+}
+.diagram-body{
+  flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:transparent;
+}
+/* ── Simulation trace ────────────────────────────────────── */
+.trace-panel{
+  position:absolute;bottom:0;left:0;right:0;
+  background:var(--bg2);border-top:1px solid var(--border2);
+  padding:12px 22px;display:none;
+  max-height:160px;overflow-y:auto;
+  transition:bottom .2s;
+}
+.trace-panel.visible{display:block}
+.trace-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;margin-bottom:8px}
+.trace-steps{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.trace-step{
+  display:flex;align-items:center;gap:4px;font-size:12px;
+  font-family:'Courier New',monospace;
+}
+.trace-state{
+  padding:3px 9px;border-radius:4px;font-weight:600;
+  background:var(--bg3);border:1px solid var(--border2);color:var(--text);
+}
+.trace-state.accept{background:rgba(62,207,110,.15);border-color:var(--teal);color:var(--teal)}
+.trace-state.trap{background:rgba(232,85,85,.15);border-color:var(--red);color:var(--red)}
+.trace-state.current{background:rgba(245,166,35,.15);border-color:var(--orange);color:var(--orange)}
+.trace-arrow{color:var(--text3);font-size:14px}
+.trace-sym{color:var(--purple2);font-size:11px;margin:0 1px}
+.trace-result{font-size:12px;font-weight:600;margin-top:8px}
+.trace-result.valid{color:var(--green)}
+.trace-result.invalid{color:var(--red)}
+
+/* ── SVG canvas ──────────────────────────────────────────── */
+#dfa-svg{width:100%;height:100%;display:block}
+
+/* ── Legend ──────────────────────────────────────────────── */
+.legend{
+  position:absolute;right:18px;bottom:18px;
+  background:rgba(14,17,32,.85);
+  border:1px solid var(--border2);border-radius:var(--r);
+  padding:12px 16px;min-width:155px;
+  backdrop-filter:blur(8px);
+}
+.legend-title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:9px}
+.legend-item{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:12px;color:var(--text2)}
+.legend-item:last-child{margin-bottom:0}
+.lg-dot{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.lg-regular{background:var(--bg3);border:1.5px solid var(--border2)}
+.lg-start{background:var(--bg3);border:2px solid var(--purple2);color:var(--purple2)}
+.lg-current{background:var(--bg3);border:2px solid var(--orange)}
+.lg-accept{background:var(--bg3);border:2px solid var(--teal);color:var(--teal)}
+.lg-trap{background:var(--bg3);border:2px solid var(--red);color:var(--red)}
+
+/* ── PDA empty state ─────────────────────────────────────── */
+.pda-content{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:16px;color:var(--text3);
+}
+.pda-content h3{font-size:16px;color:var(--text2);font-weight:500}
+.pda-tabs{display:flex;gap:6px;padding:12px 18px 0;background:var(--bg2);border-bottom:1px solid var(--border)}
+.pda-tab{background:transparent;border:1px solid var(--border2);color:var(--text2);padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .18s}
+.pda-tab:hover{background:var(--bg3);border-color:var(--purple)}
+.pda-tab.active{background:var(--purple);border-color:var(--purple);color:#fff}
+#pda-sub-table{overflow:auto}
+#pda-sub-flow{flex:1;min-height:380px}
+.pda-table-wrap{padding:24px;width:100%;overflow:auto}
+.pda-table{
+  width:100%;border-collapse:collapse;font-size:12px;
+  font-family:'Courier New',monospace;
+}
+.pda-table th{
+  background:var(--bg3);color:var(--text3);
+  padding:8px 12px;text-align:left;font-size:11px;
+  letter-spacing:.06em;border-bottom:1px solid var(--border2);
+  font-family:var(--font);
+}
+.pda-table td{
+  padding:7px 12px;border-bottom:1px solid var(--border);
+  color:var(--text);
+}
+.pda-table tr:hover td{background:rgba(255,255,255,.02)}
+.pda-state{color:var(--purple2)}
+.pda-sym{color:var(--teal)}
+.pda-act{color:var(--orange)}
+
+/* ── CFG Modal ───────────────────────────────────────────── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.6);
+  z-index:500;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:12px;padding:0;width:560px;max-width:94vw;
+  max-height:88vh;display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border);
+}
+.modal-head h3{font-size:15px;font-weight:600;color:var(--text)}
+.modal-close{
+  background:transparent;border:none;color:var(--text3);
+  font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;
+  border-radius:4px;transition:color .15s;
+}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.cfg-section{margin-bottom:18px}
+.cfg-section-title{
+  font-size:11px;font-weight:600;color:var(--text3);
+  letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase;
+}
+.cfg-block{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 16px;
+  font-family:'Courier New',monospace;font-size:12.5px;
+  color:var(--text);line-height:2;
+}
+.cfg-block .nt{color:var(--purple2);font-weight:600}
+.cfg-block .term{color:var(--teal)}
+.cfg-block .arrow{color:var(--text3)}
+.cfg-block .eps{color:var(--orange)}
+.cfg-note{
+  background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);
+  border-radius:var(--r);padding:10px 14px;
+  font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:14px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* ── Anim ─────────────────────────────────────────────────── */
+/* ── Anim ─────────────────────────────────────────────────── */
+@keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+.modal.open{animation:fadeIn .18s ease}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media(max-width:700px){
+  .sidebar{width:180px;min-width:180px}
+  .brand{font-size:15px}
+}
+
+/* ── Animation Controls ──────────────────────────────────── */
+.anim-bar{
+  display:none;
+  flex-direction:column;gap:8px;
+  padding:10px 22px 12px;
+  background:var(--bg2);
+  border-top:1px solid var(--border2);
+  flex-shrink:0;
+}
+.anim-bar.visible{display:flex}
+.anim-controls-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.anim-btn{
+  background:transparent;border:1px solid var(--border2);
+  color:var(--text);width:34px;height:34px;border-radius:50%;
+  font-size:14px;cursor:pointer;font-family:var(--font);
+  transition:all .15s;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.anim-btn:hover{background:var(--bg3);border-color:var(--purple)}
+.anim-btn:disabled{opacity:.3;cursor:default}
+.anim-btn.playing{border-color:var(--orange);color:var(--orange)}
+.anim-chars{
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;flex:1;
+}
+.anim-char{
+  width:28px;height:28px;border-radius:6px;
+  background:var(--bg3);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-family:'Courier New',monospace;font-weight:700;
+  color:var(--text2);transition:all .2s;
+  flex-shrink:0;
+}
+.anim-char.done{background:rgba(108,99,255,.12);border-color:var(--purple);color:var(--purple2)}
+.anim-char.active{
+  background:rgba(245,166,35,.2);border-color:var(--orange);
+  color:var(--orange);
+  box-shadow:0 0 10px rgba(245,166,35,.4);
+  transform:scale(1.18);
+}
+.anim-char.rejected{background:rgba(232,85,85,.15);border-color:var(--red);color:var(--red)}
+.anim-char.accepted{background:rgba(62,207,110,.15);border-color:var(--green);color:var(--green)}
+.anim-speed{
+  display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);
+  flex-shrink:0;
+}
+.anim-speed input[type=range]{
+  width:70px;accent-color:var(--purple2);
+}
+.anim-step-info{
+  font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0;
+}
+/* pulse ring on highlighted SVG state */
+@keyframes stateRing{
+  0%  {r:28;opacity:.8;stroke-width:2.5}
+  60% {r:36;opacity:0;stroke-width:1}
+  100%{r:36;opacity:0;stroke-width:1}
+}
+.state-pulse{animation:stateRing .55s ease-out forwards}
+/* travelling token along edge */
+@keyframes tokenMove{
+  from{offset-distance:0%}
+  to{offset-distance:100%}
+}
+.edge-token{
+  animation:tokenMove var(--tok-dur,.45s) ease-in-out forwards;
+  offset-path:attr(d path);
+}
+/* trace step highlight */
+.trace-step.anim-active .trace-state{
+  background:rgba(245,166,35,.2)!important;
+  border-color:var(--orange)!important;
+  color:var(--orange)!important;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ─────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="page-crumb" id="page-crumb">DFA · RE#1</span>
+    <span class="brand">REGEX Simulator</span>
+  </div>
+  <div class="topbar-right">
+    <button class="top-btn active" onclick="showPage('converter')">Converter</button>
+    <button class="top-btn" onclick="showPage('manual')">User Manual</button>
+  </div>
+</div>
+
+<!-- ── INPUT ROW ──────────────────────────────────────── -->
+<div class="input-row" id="input-row">
+  <span class="input-label">Input String</span>
+  <div class="input-wrap">
+    <input class="string-input" id="string-input" type="text" placeholder="e.g. aba"
+      oninput="onInputChange()" onkeydown="if(event.key==='Enter')simulate()"/>
+  </div>
+  <div class="status-badge idle" id="status-badge">—</div>
+  <button class="simulate-btn" onclick="simulate()">Simulate</button>
+</div>
+
+<!-- ── MAIN ────────────────────────────────────────────── -->
+<div class="main" id="main-converter">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div>
+      <div class="sidebar-section-title">Regular Expressions</div>
+      <div class="re-card active" id="re1-card" onclick="selectRE(1)">
+        <div class="re-label">RE #1 · Σ = {a, b}</div>
+        <div class="re-formula">(aa+bb)(a+b)*(a+b+ab+ba)(a+b+ab+ba)*(aa+bab)*(a+b+aa)(a+b+bb+aa)*</div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="re-card" id="re2-card" onclick="selectRE(2)">
+        <div class="re-label">RE #2 · Σ = {0, 1}</div>
+        <div class="re-formula">((101)+(111)*+(100)+(1+0+11)*)(1+0+01)*(111+000+101)(1+0)*</div>
+      </div>
+    </div>
+    <hr class="sidebar-divider"/>
+    <div>
+      <div class="fl-title">Formal Languages</div>
+      <button class="fl-btn active" id="fl-dfa" onclick="selectFL('dfa')">
+        <div class="fl-main">DFA</div>
+        <div class="fl-sub">Deterministic Finite Automaton</div>
+      </button>
+      <button class="fl-btn" id="fl-cfg" onclick="selectFL('cfg')">
+        <div class="fl-main">CFG</div>
+        <div class="fl-sub">Context – Free Grammar</div>
+      </button>
+      <button class="fl-btn" id="fl-pda" onclick="selectFL('pda')">
+        <div class="fl-main">PDA</div>
+        <div class="fl-sub">Pushdown Automaton</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- DIAGRAM PANEL -->
+  <div class="diagram-panel">
+    <div class="diagram-header">
+      <span>State Diagram</span>
+      <span class="diagram-badge" id="diagram-badge">DFA</span>
+    </div>
+
+    <!-- DFA VIEW -->
+    <div class="diagram-body" id="dfa-view">
+      <svg id="dfa-svg" viewBox="0 0 900 400" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M1 1L9 5L1 9" fill="none" stroke="#3a4a7a" stroke-width="1.5" stroke-linecap="round"/>
+          </marker>
+          <marker id="arr-hl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M1 1L9 5L1 9" fill="none" stroke="#f5a623" stroke-width="1.5" stroke-linecap="round"/>
+          </marker>
+          <filter id="glow-teal">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-orange">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- drawn by JS -->
+      </svg>
+
+      <!-- Legend -->
+      <div class="legend" id="legend">
+        <div class="legend-title">States:</div>
+        <div class="legend-item"><div class="lg-dot lg-regular"></div> Regular state</div>
+        <div class="legend-item"><div class="lg-dot lg-start">−</div> Start state</div>
+        <div class="legend-item"><div class="lg-dot lg-current"></div> Current state</div>
+        <div class="legend-item"><div class="lg-dot lg-accept">+</div> Accepting state</div>
+        <div class="legend-item lg-trap-row" id="legend-trap-row">
+          <div class="lg-dot lg-trap">T</div> Trap state
+        </div>
+      </div>
+
+      <!-- Trace -->
+      <div class="trace-panel" id="trace-panel">
+        <div class="trace-title">SIMULATION TRACE</div>
+        <div class="trace-steps" id="trace-steps"></div>
+        <div class="trace-result" id="trace-result"></div>
+      </div>
+    </div>
+
+    <!-- Animation Bar (below diagram-body, inside diagram-panel) -->
+    <div class="anim-bar" id="anim-bar">
+      <div class="anim-chars" id="anim-chars"></div>
+      <div class="anim-controls-row">
+        <button class="anim-btn" id="anim-prev" title="Step back" onclick="animStep(-1)">&#8249;</button>
+        <button class="anim-btn" id="anim-play" title="Play / Pause" onclick="animTogglePlay()">&#9654;</button>
+        <button class="anim-btn" id="anim-next" title="Step forward" onclick="animStep(1)">&#8250;</button>
+        <button class="anim-btn" id="anim-reset-btn" title="Reset" onclick="animReset()" style="font-size:11px">&#8635;</button>
+        <div class="anim-step-info" id="anim-step-info">step 0 / 0</div>
+        <div class="anim-speed">
+          <span>Speed</span>
+          <input type="range" id="anim-speed-slider" min="1" max="5" value="3" oninput="updateAnimSpeed()"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- PDA VIEW -->
+    <div class="diagram-body" id="pda-view" style="display:none;flex-direction:column;align-items:stretch;justify-content:flex-start">
+      <!-- PDA sub-tabs -->
+      <div class="pda-tabs">
+        <button class="pda-tab active" id="pda-tab-table" onclick="switchPDATab('table')">Transition Table</button>
+        <button class="pda-tab" id="pda-tab-flow" onclick="switchPDATab('flow')">Flowchart</button>
+      </div>
+      <!-- Table sub-view -->
+      <div id="pda-sub-table">
+        <div class="pda-table-wrap">
+          <table class="pda-table" id="pda-table">
+            <thead>
+              <tr>
+                <th>State</th><th>Input</th><th>Stack Top</th>
+                <th>New State</th><th>Stack Op</th>
+              </tr>
+            </thead>
+            <tbody id="pda-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Flowchart sub-view -->
+      <div id="pda-sub-flow" style="display:none;flex:1;position:relative;overflow:hidden">
+        <svg id="pda-svg" width="100%" height="100%" style="display:block;min-height:420px"></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MANUAL PAGE ────────────────────────────────────── -->
+<div style="display:none;padding:32px 40px;max-width:860px;margin:0 auto" id="main-manual">
+  <h2 style="font-size:22px;font-weight:700;margin-bottom:6px">User Manual</h2>
+  <p style="color:var(--text2);font-size:14px;margin-bottom:28px">How to use the REGEX Simulator — Group 3 · BSCS34</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <h3 style="font-size:14px;font-weight:600;color:var(--purple2);margin-bottom:8px">⬡ Step 1 — Select a Regular Expression</h3>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">Use the sidebar on the left to choose between <b>RE #1</b> (alphabet {a, b}) or <b>RE #2</b> (alphabet {0, 1}). The active RE is highlighted.</p>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <h3 style="font-size:14px;font-weight:600;color:var(--teal);margin-bottom:8px">⊢ Step 2 — Choose a Formal Language</h3>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">Click <b>DFA</b>, <b>CFG</b>, or <b>PDA</b> in the sidebar. DFA shows the state diagram. CFG opens a grammar popup. PDA shows the transition table.</p>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <h3 style="font-size:14px;font-weight:600;color:var(--orange);margin-bottom:8px">↩ Step 3 — Enter a String</h3>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">Type a string in the <b>Input String</b> field. Use only the symbols from the selected RE's alphabet (a/b for RE#1, 0/1 for RE#2).</p>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px">
+      <h3 style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:8px">▶ Step 4 — Simulate</h3>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">Click <b>Simulate</b> (or press Enter). The badge turns <span style="color:var(--green)">green (Valid)</span> or <span style="color:var(--red)">red (Invalid)</span>. The trace below the diagram shows each state transition.</p>
+    </div>
+  </div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:0px">
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px">Reading the DFA Diagram</h3>
+    <ul style="font-size:13px;color:var(--text2);line-height:2;padding-left:18px">
+      <li>The <b style="color:var(--purple2)">−</b> symbol marks the <b>start state</b></li>
+      <li>The <b style="color:var(--teal)">+</b> symbol marks <b>accept states</b> (double circle)</li>
+      <li>The <b style="color:var(--orange)">orange</b> circle shows the <b>current state</b> during simulation</li>
+      <li>The <b style="color:var(--red)">T</b> state is a <b>trap / dead state</b> — strings reaching it are rejected</li>
+      <li>Arrows between states are labelled with the input symbol that causes that transition</li>
+    </ul>
+  </div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px">
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">Group Members — BSCS34</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:var(--text2)">
+      <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">Ricafrente, Jose Uriel V.</div>
+      <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">Raba, Kurt Denver L.</div>
+      <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">Arago, Emerson Pedro</div>
+      <div style="padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">Barnachea, Bea Lyn</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CFG MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay" id="cfg-modal" onclick="closeCFG(event)">
+  <div class="modal" id="cfg-modal-inner">
+    <div class="modal-head">
+      <h3 id="cfg-modal-title">Context-free Grammar</h3>
+      <button class="modal-close" onclick="closeCFGForce()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="cfg-note" id="cfg-note"></div>
+      <div class="cfg-section">
+        <div class="cfg-section-title">Production Rules</div>
+        <div class="cfg-block" id="cfg-rules"></div>
+      </div>
+      <div class="cfg-section">
+        <div class="cfg-section-title">Formal Definition</div>
+        <div class="cfg-block" id="cfg-formal"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   DATA — DFA definitions
+   ═══════════════════════════════════════════════════════ */
+
+// RE #1 — alphabet {a, b}
+// States: 0=q0(start), 1=q1, 2=q2, 3=q3, 4=q4(accept), 5=q5(accept), 6=qT(trap)
+const RE1 = {
+  alphabet: ['a','b'],
+  states: [
+    {id:0, label:'', x:120, y:200, start:true, accept:false, trap:false},
+    {id:1, label:'q₁', x:265, y:85, start:false, accept:false, trap:false},
+    {id:2, label:'q₂', x:265, y:300, start:false, accept:false, trap:false},
+    {id:3, label:'q₃', x:420, y:200, start:false, accept:false, trap:false},
+    {id:4, label:'q₄', x:575, y:110, start:false, accept:false,  trap:false},
+    {id:5, label:'q₅', x:575, y:290, start:false, accept:false,  trap:false},
+    {id:6, label:'T',  x:270, y:200, start:false, accept:false, trap:true},
+    {id:7, label:'+', x:720, y:110, start:false, accept:true, trap:false},
+    {id:8, label:'+', x:720, y:290, start:false, accept:true, trap:false},
+],
+  // delta[state][symbol] = nextState
+  delta: {
+    0: {a:1, b:2},
+    1: {a:3, b:6},
+    2: {a:6, b:3},
+    3: {a:4, b:5},
+    4: {a:7, b:7},
+    5: {a:8, b:8},
+    6: {a:6, b:6},
+    7: {a:7, b:7},
+    8: {a:8, b:8},
+  },
+  startState: 0,
+  acceptStates: [7, 8],
+  // Edges: [from, to, label, curve offset]
+  edges: [
+    [0,1,'a',-50],
+    [0,2,'b',50],
+    [1,3,'a',-50],
+    [1,6,'b',0],
+    [2,3,'b',50],
+    [2,6,'a', -0],
+    [3,4,'a',-30],
+    [3,5,'b',30],
+    [6,6,'a,b',2,'self'],
+    [4,7,'a',-60],
+    [4,7,'b', 60],
+    [5,8,'a',-60],
+    [5,8,'b', 60],
+    [7,7,'a,b',0,'self'],
+    [8,8,'a,b',0,'self'],
+  ],
+};
+
+// RE #2 — alphabet {0, 1}
+// Layout matches reference image:
+//   0=q0(start,left) 1=q1(upper-left) 2=q2(lower-left)
+//   3=q3(top-center) 4=q4(center) 5=q5(bottom-center) 6=q6(+,right)
+// Transitions from image:
+//   q0: 1→q1, 0→q2
+//   q1: 1→q3, 0→q4
+//   q2: 1→q1, 0→q5
+//   q3: 0→q4, 1→q6
+//   q4: 1→q6, 0→q5
+//   q5: 0→q6, 1→q1  (long diagonal back to q1)
+//   q6: 0,1→q6
+const RE2 = {
+  alphabet: ['0','1'],
+  states: [
+    {id:0, label:'-',  x:90,  y:200, start:true,  accept:false, trap:false},
+    {id:1, label:'q1', x:255, y:115, start:false, accept:false, trap:false},
+    {id:2, label:'q2', x:255, y:305, start:false, accept:false, trap:false},
+    {id:3, label:'q3', x:440, y:55,  start:false, accept:false, trap:false},
+    {id:4, label:'q4', x:440, y:200, start:false, accept:false, trap:false},
+    {id:5, label:'q5', x:440, y:340, start:false, accept:false, trap:false},
+    {id:6, label:'+',  x:720, y:200, start:false, accept:true,  trap:false},
+  ],
+  delta: {
+    0: {'0':2, '1':1},
+    1: {'0':4, '1':3},
+    2: {'0':5, '1':1},
+    3: {'0':4, '1':6},
+    4: {'0':5, '1':6},
+    5: {'0':6, '1':1},
+    6: {'0':6, '1':6},
+  },
+  startState: 0,
+  acceptStates: [6],
+  edges: [
+    // q0 left side
+    [0,1,'1', -30],
+    [0,2,'0',  30],
+    // q1 going right
+    [1,3,'1', -20],
+    [1,4,'0',  5],
+    // q2 going up to q1, right to q5
+    [2,1,'1', -40],
+    [2,5,'0',   0],
+    // q3 going down to q4, long arc to +
+    [3,4,'0',   0],
+    [3,6,'1', -55],
+    // q4 going down to q5, right to +
+    [4,5,'0',   0],
+    [4,6,'1',   0],
+    // q5 going long arc to +, long diagonal back to q1
+    [5,6,'0',  60],
+    [5,1,'1',   0],
+    // + self-loop
+    [6,6,'0,1',0,'self'],
+  ],
+};
+
+/* ═══════════════════════════════════════════════════════
+   CFG DATA
+   ═══════════════════════════════════════════════════════ */
+const CFG_RE1 = {
+  title: 'Context-free Grammar — RE #1',
+  note: 'Right-linear CFG derived from the DFA for RE #1 (alphabet {a, b}). Each non-terminal maps to a DFA state. The start variable S corresponds to q₀.',
+  rules: [
+    ['S', 'aA | bB'],
+    ['A', 'aC'],
+    ['B', 'bC'],
+    ['C', 'aD | bE'],
+    ['D', 'aF | bF'],
+    ['E', 'aG | bG'],
+    ['F', 'aF | bF | ε'],
+    ['G', 'aG | bG | ε'],
+  ],
+  formal: [
+    'G = (V, Σ, P, S)',
+    'V = {S, A, B, C, D, E, F, G}',
+    'Σ = {a, b}',
+    'S = S  (start variable)',
+    'P = productions above',
+  ],
+};
+
+const CFG_RE2 = {
+  title: 'Context-free Grammar — RE #2',
+  note: 'Right-linear CFG derived from the DFA for RE #2 (alphabet {0, 1}). Each non-terminal maps to a DFA state.',
+  rules: [
+    ['S', '1A | 0B'],
+    ['A', '0C | 1C'],
+    ['B', '0C | 1C'],
+    ['C', '1D | 0E | 0C | 1C'],
+    ['D', '1F | 0D | 1D'],
+    ['E', '0F | 1E | 0E'],
+    ['F', '0F | 1F | ε'],
+  ],
+  formal: [
+    'G = (V, Σ, P, S)',
+    'V = {S, A, B, C, D, E, F}',
+    'Σ = {0, 1}',
+    'S = S  (start variable)',
+    'P = productions above',
+  ],
+};
+
+/* ═══════════════════════════════════════════════════════
+   PDA DATA
+   ═══════════════════════════════════════════════════════ */
+const PDA_RE1 = [
+  ['q₀','a','Z₀','q₁','keep Z₀'],
+  ['q₀','b','Z₀','q₂','keep Z₀'],
+  ['q₁','a','Z₀','q₃','keep Z₀'],
+  ['q₁','b','Z₀','qT','keep Z₀'],
+  ['q₂','a','Z₀','qT','keep Z₀'],
+  ['q₂','b','Z₀','q₃','keep Z₀'],
+  ['q₃','a','Z₀','q₄','keep Z₀'],
+  ['q₃','b','Z₀','q₅','keep Z₀'],
+  ['q₄','a,b','Z₀','q₄','keep Z₀'],
+  ['q₅','a,b','Z₀','q₅','keep Z₀'],
+  ['qT','a,b','Z₀','qT','keep Z₀'],
+];
+
+const PDA_RE2 = [
+  ['q₀','1','Z₀','q₁','keep Z₀'],
+  ['q₀','0','Z₀','q₂','keep Z₀'],
+  ['q₁','0,1','Z₀','q₃','keep Z₀'],
+  ['q₂','0,1','Z₀','q₃','keep Z₀'],
+  ['q₃','1','Z₀','q₄','keep Z₀'],
+  ['q₃','0','Z₀','q₅','keep Z₀'],
+  ['q₄','1','Z₀','q₆','keep Z₀'],
+  ['q₄','0','Z₀','q₄','keep Z₀'],
+  ['q₅','0','Z₀','q₆','keep Z₀'],
+  ['q₅','1','Z₀','q₅','keep Z₀'],
+  ['q₆','0,1','Z₀','q₆','keep Z₀'],
+];
+
+/* ═══════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════ */
+let curRE = 1;
+let curFL = 'dfa';
+let currentPage = 'converter';
+let highlightedState = null;
+
+/* ═══════════════════════════════════════════════════════
+   PAGE / RE / FL SWITCHING
+   ═══════════════════════════════════════════════════════ */
+function showPage(p) {
+  currentPage = p;
+  document.getElementById('main-converter').style.display = p==='converter' ? 'flex' : 'none';
+  document.getElementById('main-manual').style.display    = p==='manual'    ? 'block': 'none';
+  document.getElementById('input-row').style.display      = p==='converter' ? 'flex' : 'none';
+  document.querySelectorAll('.top-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(p==='converter'?'conv':'manual'));
+  });
+  if(p==='converter') renderDFA(curRE);
+}
+
+function selectRE(n) {
+  curRE = n;
+  document.getElementById('re1-card').classList.toggle('active', n===1);
+  document.getElementById('re2-card').classList.toggle('active', n===2);
+  resetSim();
+  applyFL(curFL);
+}
+
+function selectFL(fl) {
+  curFL = fl;
+  ['dfa','cfg','pda'].forEach(x=>{
+    document.getElementById('fl-'+x).classList.toggle('active', x===fl);
+  });
+  applyFL(fl);
+}
+
+function applyFL(fl) {
+  resetSim();
+  document.getElementById('dfa-view').style.display = fl==='dfa' ? 'flex' : 'none';
+  document.getElementById('pda-view').style.display = fl==='pda' ? 'flex' : 'none';
+
+  const badge = document.getElementById('diagram-badge');
+  badge.textContent = fl.toUpperCase();
+
+  const crumb = document.getElementById('page-crumb');
+  crumb.textContent = fl.toUpperCase() + ' · RE#' + curRE;
+
+  document.getElementById('legend-trap-row').style.display = (fl==='dfa' && curRE===1) ? 'flex' : 'none';
+
+  if(fl==='dfa') {
+    renderDFA(curRE);
+  } else if(fl==='cfg') {
+    openCFG();
+    // switch back to DFA visually after showing modal
+    document.getElementById('dfa-view').style.display = 'flex';
+    renderDFA(curRE);
+  } else if(fl==='pda') {
+    renderPDA(curRE);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   SVG HELPERS
+   ═══════════════════════════════════════════════════════ */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for(const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function stateColor(st, isHighlighted) {
+  if(isHighlighted) return {stroke:'#f5a623', fill:'rgba(245,166,35,.1)', glow:true};
+  if(st.trap)   return {stroke:'#e85555', fill:'rgba(232,85,85,.08)',  glow:false};
+  if(st.accept) return {stroke:'#3ecfb8', fill:'rgba(62,207,184,.08)', glow:false};
+  if(st.start)  return {stroke:'#6c63ff', fill:'rgba(108,99,255,.08)', glow:false};
+  return {stroke:'#2e3860', fill:'rgba(26,31,53,.9)', glow:false};
+}
+
+function drawState(svg, st, isHighlighted) {
+  const c = stateColor(st, isHighlighted);
+  const g = svgEl('g', {class:'state-g', 'data-id':st.id});
+
+  // outer circle
+  const circle = svgEl('circle', {
+    cx:st.x, cy:st.y, r:28,
+    fill:c.fill,
+    stroke:c.stroke,
+    'stroke-width': isHighlighted ? 2.5 : (st.accept || st.trap ? 2.5 : 1.5),
+    filter: isHighlighted ? 'url(#glow-orange)' : (st.accept ? 'url(#glow-teal)' : 'none'),
+  });
+  g.appendChild(circle);
+
+  // inner circle for accept
+  if(st.accept) {
+    const inner = svgEl('circle', {
+      cx:st.x, cy:st.y, r:21,
+      fill:'none', stroke:c.stroke, 'stroke-width':1.5,
+    });
+    g.appendChild(inner);
+  }
+
+  // label
+  const lbl = svgEl('text', {
+    x:st.x, y:st.y,
+    'text-anchor':'middle',
+    'dominant-baseline':'central',
+    fill: isHighlighted ? '#f5a623' : (st.accept ? '#3ecfb8' : st.trap ? '#e85555' : st.start ? '#a89af9' : '#c8d0f0'),
+    'font-size': st.accept && st.label==='+' ? '18' : '13',
+    'font-weight':'700',
+    'font-family':'monospace',
+  });
+  // special symbol for start (−) and accept (+)
+  if(st.start && !st.accept) lbl.textContent = '−';
+  else if(st.accept && st.label==='+') lbl.textContent = '+';
+  else lbl.textContent = st.label;
+
+  // small subscript for q labels
+  if(st.label.startsWith('q')) {
+    lbl.textContent = '';
+    const q = svgEl('tspan', {});
+    q.textContent = 'q';
+    const sub = svgEl('tspan', {'font-size':'9','baseline-shift':'-4'});
+    sub.textContent = st.label.slice(1);
+    lbl.appendChild(q);
+    lbl.appendChild(sub);
+  }
+  g.appendChild(lbl);
+
+  // start symbol '−'
+  if(st.start) {
+    const sym = svgEl('text', {
+      x:st.x, y:st.y,
+      'text-anchor':'middle','dominant-baseline':'central',
+      fill:'#8a83ff','font-size':'16','font-weight':'700','font-family':'sans-serif',
+    });
+    sym.textContent = '−';
+    g.appendChild(sym);
+  }
+
+  svg.appendChild(g);
+}
+
+function arcPath(x1,y1,x2,y2,bend) {
+  // Returns a quadratic bezier path
+  const mx = (x1+x2)/2, my = (y1+y2)/2;
+  const dx = x2-x1, dy = y2-y1;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  if(len===0) return '';
+  const nx = -dy/len, ny = dx/len;
+  const cx = mx + nx*bend, cy = my + ny*bend;
+  return `M${x1} ${y1} Q${cx} ${cy} ${x2} ${y2}`;
+}
+
+function drawEdge(svg, re, from, to, label, bend, special) {
+  const s = re.states[from], t = re.states[to];
+  const R = 28;
+
+ if(special==='self') {
+  // Trap states loop downward; others loop upward
+  const isTrap = s.trap === true;
+  const loopPath = isTrap
+    ? `M${s.x-26} ${s.y-12} C${s.x-75} ${s.y-60} ${s.x-75} ${s.y+30} ${s.x-26} ${s.y+12}`
+    : `M${s.x+12} ${s.y-26} C${s.x+70} ${s.y-70} ${s.x-30} ${s.y-70} ${s.x-12} ${s.y-26}`;
+  const labelY = isTrap ? s.y : s.y - 68;
+  const labelX = isTrap ? s.x - 88 : s.x;
+
+  const path = svgEl('path', {
+    d: loopPath,
+    fill:'none', stroke:'#2e3860', 'stroke-width':'1.5',
+    'marker-end':'url(#arr)',
+  });
+  svg.appendChild(path);
+  const txt = svgEl('text', {
+    x:labelX, y:labelY,
+    'text-anchor':'middle','dominant-baseline':'central',
+    fill:'#7a87bb','font-size':'11','font-family':'monospace',
+  });
+  txt.textContent = label;
+  svg.appendChild(txt);
+  return;
+}
+
+  // compute edge start/end on circle boundary
+  const dx = t.x-s.x, dy = t.y-s.y;
+  const angle = Math.atan2(dy, dx);
+  const ex1 = s.x + Math.cos(angle)*R, ey1 = s.y + Math.sin(angle)*R;
+  const ex2 = t.x - Math.cos(angle)*R, ey2 = t.y - Math.sin(angle)*R;
+
+  const d = arcPath(ex1,ey1,ex2,ey2,bend||0);
+  const path = svgEl('path', {
+    d, fill:'none', stroke:'#2e3860', 'stroke-width':'1.5',
+    'marker-end':'url(#arr)',
+  });
+  svg.appendChild(path);
+
+  // label midpoint of arc
+  const mx = (ex1+ex2)/2, my = (ey1+ey2)/2;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  const nx = -dy/len, ny = dx/len;
+  const off = (bend||0)*0.5 + (bend!==0 ? 14 : 0);
+  const tx = mx + nx*off * (bend===0 ? 0 : 1), ty = my + ny*off * (bend===0 ? 0 : 1);
+
+  const txt = svgEl('text', {
+    x: bend===0 ? mx + nx*14 : tx,
+    y: bend===0 ? my + ny*14 : (bend < 0 ? ty - 3 : ty + 3),
+    'text-anchor':'middle','dominant-baseline':'central',
+    fill:'#7a87bb','font-size':'11','font-family':'monospace',
+  });
+  txt.textContent = label;
+  svg.appendChild(txt);
+}
+
+function drawStartArrow(svg, st) {
+  const x = st.x - 28, y = st.y;
+  const path = svgEl('path', {
+    d:`M${x-40} ${y} L${x} ${y}`,
+    fill:'none', stroke:'#6c63ff', 'stroke-width':'1.5',
+    'marker-end':'url(#arr)',
+  });
+  svg.appendChild(path);
+}
+
+/* ═══════════════════════════════════════════════════════
+   RENDER DFA
+   ═══════════════════════════════════════════════════════ */
+function renderDFA(reNum, hl=null) {
+  const re = reNum===1 ? RE1 : RE2;
+  const svg = document.getElementById('dfa-svg');
+  // clear (keep defs)
+  [...svg.children].forEach(c=>{ if(c.tagName!=='defs') c.remove(); });
+
+  // draw edges first (behind states)
+  for(const [from, to, label, bend, special] of re.edges) {
+    drawEdge(svg, re, from, to, label, bend, special);
+  }
+
+  // draw states
+  for(const st of re.states) {
+    drawState(svg, st, hl===st.id);
+  }
+
+  // start arrow
+  const startSt = re.states.find(s=>s.start);
+  drawStartArrow(svg, startSt);
+
+  document.getElementById('legend-trap-row').style.display =
+    (re.states.some(s=>s.trap)) ? 'flex' : 'none';
+}
+
+/* ═══════════════════════════════════════════════════════
+   RENDER PDA
+   ═══════════════════════════════════════════════════════ */
+function switchPDATab(tab) {
+  document.getElementById('pda-tab-table').classList.toggle('active', tab==='table');
+  document.getElementById('pda-tab-flow').classList.toggle('active', tab==='flow');
+  document.getElementById('pda-sub-table').style.display = tab==='table' ? 'block' : 'none';
+  document.getElementById('pda-sub-flow').style.display  = tab==='flow'  ? 'block' : 'none';
+  if(tab==='flow') renderPDAFlowchart(curRE);
+}
+
+function renderPDAFlowchart(reNum) {
+  const svgEl = document.getElementById('pda-svg');
+  svgEl.innerHTML = '';
+
+  // Fixed canvas — we use a viewBox so it scales cleanly
+  const VW = 860, VH = 560;
+  svgEl.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+  svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const C = {
+    purple:'#6c63ff', purple2:'#8a83ff',
+    teal:'#3ecfb8',   orange:'#f5a623',
+    red:'#e85555',    green:'#3ecf6e',
+    text:'#c8d0f0',   text2:'#7a87bb', text3:'#4a5580',
+    bg:'rgba(14,17,32,0.94)', border:'#2e3860',
+  };
+
+  // ── SVG helpers ───────────────────────────────────────────────
+  function mk(tag, attrs, parent) {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,v);
+    (parent||svgEl).appendChild(e);
+    return e;
+  }
+  function txt(x,y,str,color,size,weight,anchor) {
+    mk('text',{x,y,'text-anchor':anchor||'middle','font-size':size||11,
+      'font-family':"'Segoe UI',system-ui,sans-serif",
+      'font-weight':weight||'400',fill:color}).textContent=str;
+  }
+
+  // ── Defs: arrowhead + glow filters ───────────────────────────
+  const defs = mk('defs',{});
+  defs.innerHTML = `
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5"
+      markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M1 1L9 5L1 9" fill="none" stroke="${C.text3}"
+        stroke-width="2" stroke-linecap="round"/>
+    </marker>
+    <filter id="gp" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gg" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gr" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`;
+
+  // ── Shape primitives ──────────────────────────────────────────
+  // Pill terminal  (START / ACCEPT / REJECT)
+  function pill(cx,cy,label,col,filt) {
+    const w=88,h=30,rx=15;
+    const r=mk('rect',{x:cx-w/2,y:cy-h/2,width:w,height:h,rx,
+      fill:col+'28',stroke:col,'stroke-width':2});
+    if(filt) r.setAttribute('filter',`url(#${filt})`);
+    txt(cx,cy+4.5,label,col,11,'700');
+  }
+
+  // Diamond  (READ decision)
+  function diamond(cx,cy,label,sub,col) {
+    const hw=58,hh=32;
+    mk('polygon',{
+      points:`${cx},${cy-hh} ${cx+hw},${cy} ${cx},${cy+hh} ${cx-hw},${cy}`,
+      fill:col+'18',stroke:col,'stroke-width':1.8});
+    txt(cx,cy-2,label,C.text,10,'600');
+    if(sub) txt(cx,cy+11,sub,C.text2,9,'400');
+    return {cx,cy,hw,hh};
+  }
+
+  // Straight arrow (vertical or horizontal)
+  function vArrow(x,y1,y2) {
+    mk('line',{x1:x,y1:y1+1,x2:x,y2:y2-1,
+      stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+  }
+  function hArrow(y,x1,x2) {
+    mk('line',{x1:x1+(x2>x1?1:-1),y1:y,x2:x2+(x2>x1?-1:1),y2:y,
+      stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+  }
+  // Elbow: go right/left then down (or down then right/left)
+  function elbowRightDown(x1,y1,x2,y2) {
+    mk('path',{d:`M${x1},${y1} H${x2} V${y2}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+  }
+  function elbowDownRight(x1,y1,x2,y2) {
+    mk('path',{d:`M${x1},${y1} V${y2} H${x2}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+  }
+
+  // Small edge label pill
+  function lbl(x,y,str) {
+    const fs=9,pw=str.length*5.4+8,ph=14;
+    mk('rect',{x:x-pw/2,y:y-ph/2,width:pw,height:ph,rx:4,
+      fill:C.bg,stroke:C.border,'stroke-width':0.8});
+    txt(x,y+3.5,str,C.teal,fs,'600');
+  }
+
+  // Self-loop above a diamond
+  function selfLoopAbove(cx,cy,hh,hw,label) {
+    // Right-angle rectangular loop on the right side of the diamond
+    // Exit from right-top → go right → go down → re-enter right-bottom
+    const ex = cx+hw;    // right tip of diamond
+    const rx = ex+40;    // right extent of loop
+    const yt = cy-14;    // exit point (upper)
+    const yb = cy+14;    // entry point (lower)
+    // Three sides of the rectangle (no arrow)
+    mk('line',{x1:ex,y1:yt, x2:rx,y2:yt, stroke:C.text3,'stroke-width':1.4});
+    mk('line',{x1:rx,y1:yt, x2:rx,y2:yb, stroke:C.text3,'stroke-width':1.4});
+    // Fourth side with arrowhead pointing back into diamond
+    mk('line',{x1:rx,y1:yb, x2:ex+1,y2:yb,
+      stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl(rx+22,cy,label);
+  }
+
+  // ── RE #1 Layout ──────────────────────────────────────────────
+  // Clean grid:
+  //
+  //   col:   L=150   M=430   R=710
+  //   row0:  y=40    START
+  //   row1:  y=120   q0 diamond
+  //   row2:  y=230   q1(R)   q2(L)    REJECT(M below q0)
+  //   row3:  y=330   q3 diamond (M)
+  //   row4:  y=430   q4(R)   q5(L)
+  //   row5:  y=520   ACCEPT(R) ACCEPT(L)
+  //
+  //  q0 -a→ right to q1
+  //  q0 -b→ left  to q2
+  //  q0 -ε↓ REJECT(centre, row2)
+  //  q1 -a↓ down, elbow to q3
+  //  q1 -b→ right REJECT
+  //  q2 -b↓ down, elbow to q3
+  //  q2 -a→ left  REJECT
+  //  q3 -a→ right to q4
+  //  q3 -b→ left  to q5
+  //  q4  self-loop a,b
+  //  q4 -ε↓ ACCEPT
+  //  q5  self-loop a,b
+  //  q5 -ε↓ ACCEPT
+
+  if(reNum===1){
+    const L=155, M=430, R=705;
+    const y0=40, y1=130, y2=240, y3=340, y4=440, y5=530;
+    const hw=58,hh=32, pw=88,ph=30;
+
+    // START
+    pill(M,y0,'START',C.purple,'gp');
+    vArrow(M, y0+ph/2, y1-hh);
+
+    // q0
+    diamond(M,y1,'READ','q₀',C.purple2);
+    // q0 -ε→ REJECT (straight down centre)
+    vArrow(M, y1+hh, y2-ph/2);
+    lbl(M+14, (y1+hh+y2-ph/2)/2, 'ε');
+    pill(M,y2,'REJECT',C.red,'gr');
+
+    // q0 -a→ q1 (right): elbow right then down
+    elbowRightDown(M+hw, y1, R, y2-hh);
+    lbl((M+hw+R)/2, y1-12, 'a');
+
+    // q0 -b→ q2 (left): elbow left then down
+    elbowRightDown(M-hw, y1, L, y2-hh);
+    lbl((M-hw+L)/2, y1-12, 'b');
+
+    // q1 (right col)
+    diamond(R,y2,'READ','q₁',C.purple2);
+    // q1 -b→ REJECT (right)
+    hArrow(y2, R+hw, R+hw+56);
+    lbl(R+hw+28, y2-12, 'b');
+    pill(R+hw+56+pw/2, y2,'REJECT',C.red,'gr');
+    // q1 -a→ elbow down-left to q3
+    elbowDownRight(R, y2+hh, M+hw, y3);
+    lbl(R+14, (y2+hh+y3)/2, 'a');
+
+    // q2 (left col)
+    diamond(L,y2,'READ','q₂',C.purple2);
+    // q2 -a→ REJECT (left)
+    hArrow(y2, L-hw, L-hw-56);
+    lbl(L-hw-28, y2-12, 'a');
+    pill(L-hw-56-pw/2, y2,'REJECT',C.red,'gr');
+    // q2 -b→ elbow down-right to q3
+    elbowDownRight(L, y2+hh, M-hw, y3);
+    lbl(L-14, (y2+hh+y3)/2, 'b');
+
+    // q3 (centre)
+    diamond(M,y3,'READ','q₃',C.purple2);
+    // q3 -a→ q4 (right)
+    elbowRightDown(M+hw, y3, R, y4-hh);
+    lbl((M+hw+R)/2, y3-12, 'a');
+    // q3 -b→ q5 (left)
+    elbowRightDown(M-hw, y3, L, y4-hh);
+    lbl((M-hw+L)/2, y3-12, 'b');
+
+    // q4 (right)
+    diamond(R,y4,'READ','q₄',C.purple2);
+    selfLoopAbove(R,y4,hh,hw,'a, b');
+    // q4 -ε↓ ACCEPT
+    vArrow(R, y4+hh, y5-ph/2);
+    lbl(R+14, (y4+hh+y5-ph/2)/2, 'ε');
+    pill(R,y5,'ACCEPT',C.green,'gg');
+
+    // q5 (left)
+    diamond(L,y4,'READ','q₅',C.purple2);
+    selfLoopAbove(L,y4,hh,hw,'a, b');
+    // q5 -ε↓ ACCEPT
+    vArrow(L, y4+hh, y5-ph/2);
+    lbl(L-14, (y4+hh+y5-ph/2)/2, 'ε');
+    pill(L,y5,'ACCEPT',C.green,'gg');
+
+  } else {
+    // ── RE #2 ─────────────────────────────────────────────────
+    //   col:  L=180  M=430  R=680
+    //   q0(M,y1) -1→ q1(R,y2)  -0→ q2(L,y2)
+    //   q1 -1→ q3(R,y3)  -0→ q4(M,y3)
+    //   q2 -1→ q1 (back, elbow)  -0→ q5(L,y3)
+    //   q3 -1→ ACCEPT(R,y4)  -0→ q4
+    //   q4 -1→ ACCEPT(M,y4)  -0→ q5
+    //   q5 -0→ ACCEPT(L,y4)  -1→ q1 (back)
+    const L=155, M=430, R=705;
+    const y0=36, y1=120, y2=230, y3=340, y4=450;
+    const hw=58,hh=32,pw=88,ph=30;
+
+    pill(M,y0,'START',C.purple,'gp');
+    vArrow(M,y0+ph/2,y1-hh);
+    diamond(M,y1,'READ','q₀',C.purple2);
+
+    // q0 -1→ q1(R)
+    elbowRightDown(M+hw,y1,R,y2-hh);
+    lbl((M+hw+R)/2,y1-12,'1');
+    // q0 -0→ q2(L)
+    elbowRightDown(M-hw,y1,L,y2-hh);
+    lbl((M-hw+L)/2,y1-12,'0');
+    // q0 -ε→ REJECT
+    vArrow(M,y1+hh,y2-ph/2);
+    lbl(M+14,(y1+hh+y2-ph/2)/2,'ε');
+    pill(M,y2,'REJECT',C.red,'gr');
+
+    // q1(R)
+    diamond(R,y2,'READ','q₁',C.purple2);
+    // q1 -1→ q3(R,y3) down
+    vArrow(R,y2+hh,y3-hh);
+    lbl(R+14,(y2+hh+y3-hh)/2,'1');
+    // q1 -0→ q4(M,y3) elbow
+    elbowDownRight(R,y2+hh,M+hw,y3);
+    lbl(R-14,y2+hh+28,'0');
+
+    // q2(L)
+    diamond(L,y2,'READ','q₂',C.purple2);
+    // q2 -0→ q5(L,y3) down
+    vArrow(L,y2+hh,y3-hh);
+    lbl(L-14,(y2+hh+y3-hh)/2,'0');
+    // q2 -1→ q1(R): arc back up via top
+    mk('path',{d:`M${L+hw},${y2} C${M},${y2-60} ${M},${y2-60} ${R-hw},${y2}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl(M,y2-52,'1');
+
+    // q3(R)
+    diamond(R,y3,'READ','q₃',C.purple2);
+    // q3 -1→ ACCEPT(R,y4)
+    vArrow(R,y3+hh,y4-ph/2);
+    lbl(R+14,(y3+hh+y4-ph/2)/2,'1');
+    pill(R,y4,'ACCEPT',C.green,'gg');
+    // q3 -0→ q4(M)
+    hArrow(y3,R-hw,M+hw);
+    lbl((R-hw+M+hw)/2,y3-12,'0');
+
+    // q4(M)
+    diamond(M,y3,'READ','q₄',C.purple2);
+    // q4 -1→ ACCEPT(M,y4)
+    vArrow(M,y3+hh,y4-ph/2);
+    lbl(M+14,(y3+hh+y4-ph/2)/2,'1');
+    pill(M,y4,'ACCEPT',C.green,'gg');
+    // q4 -0→ q5(L)
+    hArrow(y3,M-hw,L+hw);
+    lbl((M-hw+L+hw)/2,y3-12,'0');
+
+    // q5(L)
+    diamond(L,y3,'READ','q₅',C.purple2);
+    // q5 -0→ ACCEPT(L,y4)
+    vArrow(L,y3+hh,y4-ph/2);
+    lbl(L-14,(y3+hh+y4-ph/2)/2,'0');
+    pill(L,y4,'ACCEPT',C.green,'gg');
+    // q5 -1→ q1(R): long arc back up
+    mk('path',{d:`M${L},${y3-hh} C${L},${y1} ${R},${y1} ${R},${y2-hh}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl(M,y2-70,'1');
+  }
+
+  // ── Legend ────────────────────────────────────────────────────
+  const lx=VW-138, ly=16;
+  mk('rect',{x:lx-8,y:ly,width:136,height:90,rx:7,
+    fill:C.bg,stroke:C.border,'stroke-width':1});
+  [
+    {c:C.purple, s:'START'},
+    {c:C.purple2,s:'READ state'},
+    {c:C.green,  s:'ACCEPT'},
+    {c:C.red,    s:'REJECT'},
+  ].forEach(({c,s},i)=>{
+    mk('rect',{x:lx,y:ly+10+i*20,width:10,height:10,rx:2,fill:c});
+    txt(lx+15,ly+20+i*20,s,C.text2,9.5,'400','start');
+  });
+}
+
+function renderPDA(reNum) {
+  const rows = reNum===1 ? PDA_RE1 : PDA_RE2;
+  const tbody = document.getElementById('pda-tbody');
+  tbody.innerHTML = '';
+  for(const [state,inp,stk,nstate,op] of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="pda-state">${state}</td>
+      <td class="pda-sym">${inp}</td>
+      <td class="pda-sym">${stk}</td>
+      <td class="pda-state">${nstate}</td>
+      <td class="pda-act">${op}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CFG MODAL
+   ═══════════════════════════════════════════════════════ */
+function openCFG() {
+  const cfg = curRE===1 ? CFG_RE1 : CFG_RE2;
+  document.getElementById('cfg-modal-title').textContent = cfg.title;
+  document.getElementById('cfg-note').textContent = cfg.note;
+
+  const rulesEl = document.getElementById('cfg-rules');
+  rulesEl.innerHTML = cfg.rules.map(([nt,rule])=>
+    `<span class="nt">${nt}</span> <span class="arrow">→</span> ${
+      rule.replace(/ε/g,`<span class='eps'>ε</span>`)
+    }`
+  ).join('<br>');
+
+  const formalEl = document.getElementById('cfg-formal');
+  formalEl.innerHTML = cfg.formal.map(l=>
+    l.replace(/\{[^}]+\}/g, m=>`<span class='nt'>${m}</span>`)
+  ).join('<br>');
+
+  document.getElementById('cfg-modal').classList.add('open');
+}
+
+function closeCFG(e) {
+  if(e.target===document.getElementById('cfg-modal')) closeCFGForce();
+}
+function closeCFGForce() {
+  document.getElementById('cfg-modal').classList.remove('open');
+  // revert button to dfa
+  selectFL('dfa');
+}
+
+/* ═══════════════════════════════════════════════════════
+   SIMULATION
+   ═══════════════════════════════════════════════════════ */
+function hideAnimBar() {
+  stopPlay();
+  animPath = []; animInp = ''; animRE = null; animIdx = -1;
+  document.getElementById('anim-bar').classList.remove('visible');
+}
+
+function onInputChange() {
+  const badge = document.getElementById('status-badge');
+  badge.className = 'status-badge idle';
+  badge.textContent = '—';
+  document.getElementById('trace-panel').classList.remove('visible');
+  hideAnimBar();
+  renderDFA(curRE, null);
+}
+
+function resetSim() {
+  onInputChange();
+  document.getElementById('string-input').value = '';
+}
+
+function simulate() {
+  if(curFL !== 'dfa') {
+    // for CFG/PDA just validate and show badge
+    const inp = document.getElementById('string-input').value;
+    validateAndBadge(inp);
+    return;
+  }
+
+  const inp = document.getElementById('string-input').value;
+  const re = curRE===1 ? RE1 : RE2;
+
+  // validate characters
+  for(const ch of inp) {
+    if(!re.alphabet.includes(ch)) {
+      flashBadge('invalid');
+      showTrace([], false, `Invalid character '${ch}' — not in alphabet {${re.alphabet.join(', ')}}`, re);
+      hideAnimBar();
+      return;
+    }
+  }
+
+  // run DFA
+  let state = re.startState;
+  const path = [state];
+  for(const ch of inp) {
+    const next = re.delta[state]?.[ch];
+    if(next===undefined || next===null) { state = -1; break; }
+    state = next;
+    path.push(state);
+  }
+
+  const accepted = re.acceptStates.includes(state);
+  flashBadge(accepted ? 'valid' : 'invalid');
+
+  // highlight final state
+  renderDFA(curRE, state);
+
+  // show trace
+  showTrace(path, accepted, '', re);
+
+  // launch per-letter animation
+  stopPlay();
+  initAnim(path, inp, re);
+  animGoto(0);
+}
+
+function validateAndBadge(inp) {
+  const re = curRE===1 ? RE1 : RE2;
+  for(const ch of inp) {
+    if(!re.alphabet.includes(ch)) { flashBadge('invalid'); return; }
+  }
+  let state = re.startState;
+  for(const ch of inp) {
+    const next = re.delta[state]?.[ch];
+    if(next===undefined) { flashBadge('invalid'); return; }
+    state = next;
+  }
+  flashBadge(re.acceptStates.includes(state) ? 'valid' : 'invalid');
+}
+
+function flashBadge(status) {
+  const badge = document.getElementById('status-badge');
+  badge.className = 'status-badge ' + status;
+  badge.textContent = status==='valid' ? 'Valid' : 'Invalid';
+}
+
+function showTrace(path, accepted, errMsg, re) {
+  const panel = document.getElementById('trace-panel');
+  const steps = document.getElementById('trace-steps');
+  const result = document.getElementById('trace-result');
+  steps.innerHTML = '';
+  result.innerHTML = '';
+
+  if(errMsg) {
+    result.textContent = '⚠ ' + errMsg;
+    result.className = 'trace-result invalid';
+    panel.classList.add('visible');
+    return;
+  }
+
+  const inp = document.getElementById('string-input').value;
+
+  for(let i=0; i<path.length; i++) {
+    const sid = path[i];
+    const st = re.states[sid];
+    const isLast = i===path.length-1;
+    const cls = isLast ? (accepted ? 'accept' : 'trap') : (i===0 ? '' : '');
+
+    const stepEl = document.createElement('span');
+    stepEl.className = 'trace-step';
+
+    const stateEl = document.createElement('span');
+    stateEl.className = 'trace-state ' + cls;
+    stateEl.textContent = st.label;
+    stepEl.appendChild(stateEl);
+
+    if(i < inp.length) {
+      const arr = document.createElement('span');
+      arr.className = 'trace-arrow';
+      arr.innerHTML = `<span class="trace-sym">${inp[i]}</span>→`;
+      stepEl.appendChild(arr);
+    }
+    steps.appendChild(stepEl);
+  }
+
+  result.textContent = accepted ? '✓ String ACCEPTED — ends in accept state' : '✗ String REJECTED — does not end in accept state';
+  result.className = 'trace-result ' + (accepted ? 'valid' : 'invalid');
+  panel.classList.add('visible');
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANIMATION ENGINE
+   ═══════════════════════════════════════════════════════ */
+let animPath = [];       // state ids per step
+let animInp  = '';       // input string
+let animRE   = null;     // RE object
+let animIdx  = -1;       // current step index (-1 = not started)
+let animTimer= null;     // setInterval handle
+let animDur  = 600;      // ms per step (adjustable)
+
+const SPEED_MAP = [1100, 800, 600, 380, 200]; // index 0=slowest
+
+function updateAnimSpeed() {
+  const v = parseInt(document.getElementById('anim-speed-slider').value, 10);
+  animDur = SPEED_MAP[v - 1];
+}
+
+/* Build the animation state from a successful DFA run */
+function initAnim(path, inp, re) {
+  animPath = path;
+  animInp  = inp;
+  animRE   = re;
+  animIdx  = 0;
+
+  // build char pills
+  const cont = document.getElementById('anim-chars');
+  cont.innerHTML = '';
+  for (let i = 0; i < inp.length; i++) {
+    const pill = document.createElement('div');
+    pill.className = 'anim-char';
+    pill.id = 'anim-ch-' + i;
+    pill.textContent = inp[i];
+    cont.appendChild(pill);
+  }
+  if (inp.length === 0) {
+    const pill = document.createElement('div');
+    pill.className = 'anim-char';
+    pill.textContent = 'ε';
+    cont.appendChild(pill);
+  }
+
+  updateAnimUI();
+  document.getElementById('anim-bar').classList.add('visible');
+}
+
+/* Move to a specific step */
+function animGoto(idx) {
+  if (!animRE) return;
+  idx = Math.max(0, Math.min(idx, animPath.length - 1));
+  animIdx = idx;
+
+  const isLast   = idx === animPath.length - 1;
+  const accepted = isLast && animRE.acceptStates.includes(animPath[idx]);
+
+  // highlight DFA state
+  renderDFA(curRE, animPath[idx]);
+
+  // if transitioning (not initial state) draw a brief edge flash
+  if (idx > 0) {
+    flashEdge(animPath[idx - 1], animPath[idx]);
+  }
+
+  // char pills
+  for (let i = 0; i < animInp.length; i++) {
+    const pill = document.getElementById('anim-ch-' + i);
+    if (!pill) continue;
+    pill.className = 'anim-char';
+    if (i < idx) {
+      pill.className = isLast
+        ? ('anim-char ' + (accepted ? 'accepted' : 'rejected'))
+        : 'anim-char done';
+    } else if (i === idx) {
+      pill.className = 'anim-char active';
+    }
+  }
+
+  // highlight trace step
+  const steps = document.querySelectorAll('#trace-steps .trace-step');
+  steps.forEach((s, i) => {
+    s.classList.toggle('anim-active', i === idx);
+  });
+
+  updateAnimUI();
+}
+
+function updateAnimUI() {
+  const total = animPath.length - 1; // number of symbol transitions
+  document.getElementById('anim-step-info').textContent =
+    `step ${animIdx} / ${total}`;
+
+  const playBtn = document.getElementById('anim-play');
+  playBtn.classList.toggle('playing', !!animTimer);
+  playBtn.innerHTML = animTimer ? '&#9646;&#9646;' : '&#9654;';
+
+  document.getElementById('anim-prev').disabled = animIdx <= 0;
+  document.getElementById('anim-next').disabled = animIdx >= animPath.length - 1;
+}
+
+function animStep(delta) {
+  stopPlay();
+  animGoto(animIdx + delta);
+}
+
+function animTogglePlay() {
+  if (animTimer) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  if (animIdx >= animPath.length - 1) animIdx = 0; // restart if at end
+  animTimer = setInterval(() => {
+    if (animIdx >= animPath.length - 1) {
+      stopPlay();
+      return;
+    }
+    animGoto(animIdx + 1);
+  }, animDur);
+  updateAnimUI();
+}
+
+function stopPlay() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  updateAnimUI();
+}
+
+function animReset() {
+  stopPlay();
+  animGoto(0);
+}
+
+/* Flash the SVG edge from state `from` to state `to` */
+function flashEdge(from, to) {
+  const svg = document.getElementById('dfa-svg');
+  // remove old flash
+  svg.querySelectorAll('.edge-flash').forEach(e => e.remove());
+
+  const re = animRE;
+  const s  = re.states[from];
+  const t  = re.states[to];
+  if (!s || !t) return;
+
+  const R = 28;
+  let d;
+
+  if (from === to) {
+    // self-loop — animate a dot along the actual loop cubic path
+    // Trap states loop downward/left; all others loop upward
+    const isTrap = s.trap === true;
+    const loopD = isTrap
+      ? `M${s.x-26} ${s.y-12} C${s.x-75} ${s.y-60} ${s.x-75} ${s.y+30} ${s.x-26} ${s.y+12}`
+      : `M${s.x+12} ${s.y-26} C${s.x+70} ${s.y-70} ${s.x-30} ${s.y-70} ${s.x-12} ${s.y-26}`;
+
+    const dur = Math.max(200, animDur * 0.65);
+
+    // glow trace on the loop
+    const glowLoop = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    glowLoop.setAttribute('d', loopD);
+    glowLoop.setAttribute('fill', 'none');
+    glowLoop.setAttribute('stroke', '#f5a623');
+    glowLoop.setAttribute('stroke-width', '2.5');
+    glowLoop.setAttribute('opacity', '0.5');
+    glowLoop.setAttribute('filter', 'url(#glow-orange)');
+    glowLoop.classList.add('edge-flash');
+    svg.appendChild(glowLoop);
+
+    // travelling dot
+    const tmpLoop = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tmpLoop.setAttribute('id', '_flash_loop_tmp');
+    tmpLoop.setAttribute('d', loopD);
+    tmpLoop.setAttribute('fill', 'none');
+    tmpLoop.setAttribute('stroke', 'none');
+    tmpLoop.classList.add('edge-flash');
+    svg.appendChild(tmpLoop);
+
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', '6');
+    dot.setAttribute('fill', '#f5a623');
+    dot.setAttribute('filter', 'url(#glow-orange)');
+    dot.classList.add('edge-flash');
+
+    const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+    anim.setAttribute('dur', dur + 'ms');
+    anim.setAttribute('fill', 'freeze');
+    anim.setAttribute('calcMode', 'spline');
+    anim.setAttribute('keySplines', '0.4 0 0.6 1');
+    const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
+    mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#_flash_loop_tmp');
+    anim.appendChild(mpath);
+    dot.appendChild(anim);
+    svg.appendChild(dot);
+    anim.beginElement();
+
+    setTimeout(() => {
+      svg.querySelectorAll('.edge-flash').forEach(e => e.remove());
+    }, dur + 100);
+    return;
+  }
+
+  const dx = t.x - s.x, dy = t.y - s.y;
+  const angle = Math.atan2(dy, dx);
+  const ex1 = s.x + Math.cos(angle) * R;
+  const ey1 = s.y + Math.sin(angle) * R;
+  const ex2 = t.x - Math.cos(angle) * R;
+  const ey2 = t.y - Math.sin(angle) * R;
+
+  // find bend from edges definition
+  let bend = 0;
+  for (const [ef, et, , eb] of re.edges) {
+    if (ef === from && et === to) { bend = eb || 0; break; }
+  }
+
+  const mx = (ex1 + ex2) / 2, my = (ey1 + ey2) / 2;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return;
+  const nx = -dy / len, ny = dx / len;
+  const cx = mx + nx * bend, cy = my + ny * bend;
+  d = `M${ex1} ${ey1} Q${cx} ${cy} ${ex2} ${ey2}`;
+
+  // travelling dot
+  const dur = Math.max(200, animDur * 0.65);
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  dot.setAttribute('r', '6');
+  dot.setAttribute('fill', '#f5a623');
+  dot.setAttribute('filter', 'url(#glow-orange)');
+  dot.classList.add('edge-flash');
+
+  // Use animateMotion for cross-browser support
+  const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+  anim.setAttribute('dur', dur + 'ms');
+  anim.setAttribute('fill', 'freeze');
+  anim.setAttribute('calcMode', 'spline');
+  anim.setAttribute('keySplines', '0.4 0 0.6 1');
+  const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
+  // create a temporary path element to reference
+  const tmpPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  tmpPath.setAttribute('id', '_flash_path_tmp');
+  tmpPath.setAttribute('d', d);
+  tmpPath.setAttribute('fill', 'none');
+  tmpPath.setAttribute('stroke', 'none');
+  tmpPath.setAttribute('class', 'edge-flash');
+  svg.appendChild(tmpPath);
+  mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#_flash_path_tmp');
+  anim.appendChild(mpath);
+  dot.appendChild(anim);
+  svg.appendChild(dot);
+  anim.beginElement();
+
+  // edge glow line
+  const glowLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  glowLine.setAttribute('d', d);
+  glowLine.setAttribute('fill', 'none');
+  glowLine.setAttribute('stroke', '#f5a623');
+  glowLine.setAttribute('stroke-width', '2.5');
+  glowLine.setAttribute('opacity', '0.55');
+  glowLine.setAttribute('filter', 'url(#glow-orange)');
+  glowLine.classList.add('edge-flash');
+  svg.insertBefore(glowLine, svg.querySelector('.state-g') || dot);
+
+  // add pulse ring on destination
+  addPulseRing(svg, t);
+
+  // cleanup after animation completes
+  setTimeout(() => {
+    svg.querySelectorAll('.edge-flash').forEach(e => e.remove());
+  }, dur + 100);
+}
+
+function addPulseRing(svg, st) {
+  const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  ring.setAttribute('cx', st.x);
+  ring.setAttribute('cy', st.y);
+  ring.setAttribute('r', '28');
+  ring.setAttribute('fill', 'none');
+  ring.setAttribute('stroke', '#f5a623');
+  ring.setAttribute('stroke-width', '2.5');
+  ring.setAttribute('opacity', '0.8');
+  ring.classList.add('state-pulse', 'edge-flash');
+  svg.appendChild(ring);
+}
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════ */
+renderDFA(1);
+</script>
+</body>
+</html>

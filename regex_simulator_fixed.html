@@ -309,6 +309,42 @@ body{font-family:var(--font);background:transparent;color:var(--text);min-height
   .brand{font-size:15px}
 }
 
+/* ── PDA Simulation bar ──────────────────────────────────── */
+.pda-anim-bar{
+  display:none;flex-direction:column;gap:8px;
+  padding:10px 22px 12px;
+  background:var(--bg2);border-top:1px solid var(--border2);flex-shrink:0;
+}
+.pda-anim-bar.visible{display:flex}
+.pda-anim-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pda-stack-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);margin-top:2px}
+.pda-stack-cells{display:flex;gap:3px;align-items:center}
+.pda-stack-cell{
+  padding:3px 9px;border-radius:4px;font-size:11px;font-family:'Courier New',monospace;
+  font-weight:700;background:var(--bg3);border:1px solid var(--border2);color:var(--text);transition:all .2s;
+}
+.pda-stack-cell.top{border-color:var(--purple2);color:var(--purple2);background:rgba(108,99,255,.12)}
+.pda-state-badge{
+  padding:3px 12px;border-radius:4px;font-size:12px;font-weight:700;font-family:'Courier New',monospace;
+  background:var(--bg3);border:1px solid var(--orange);color:var(--orange);
+  transition:all .2s;min-width:52px;text-align:center;
+}
+.pda-state-badge.accept{border-color:var(--green);color:var(--green);background:rgba(62,207,110,.12)}
+.pda-state-badge.reject{border-color:var(--red);color:var(--red);background:rgba(232,85,85,.12)}
+/* flowchart node highlight */
+.pda-node-hl polygon,.pda-node-hl rect{
+  stroke:#f5a623!important;filter:drop-shadow(0 0 8px rgba(245,166,35,.7));
+  animation:pdaNodePulse .5s ease-out;
+}
+@keyframes pdaNodePulse{
+  0%{filter:drop-shadow(0 0 18px rgba(245,166,35,1))}
+  100%{filter:drop-shadow(0 0 8px rgba(245,166,35,.7))}
+}
+/* travelling dot on pda edges */
+.pda-edge-flash{ pointer-events:none }
+/* table row highlight */
+.pda-row-hl td{background:rgba(245,166,35,.12)!important;color:var(--orange)!important}
+
 /* ── Animation Controls ──────────────────────────────────── */
 .anim-bar{
   display:none;
@@ -538,6 +574,30 @@ body{font-family:var(--font);background:transparent;color:var(--text);min-height
         <svg id="pda-svg" width="100%" height="100%" style="display:block;min-height:420px"></svg>
       </div>
     </div>
+
+    <!-- PDA Animation Bar -->
+    <div class="pda-anim-bar" id="pda-anim-bar">
+      <div class="pda-anim-top">
+        <button class="anim-btn" id="pda-anim-prev" title="Step back" onclick="pdaAnimStep(-1)">&#8249;</button>
+        <button class="anim-btn" id="pda-anim-play" title="Play / Pause" onclick="pdaAnimTogglePlay()">&#9654;</button>
+        <button class="anim-btn" id="pda-anim-next" title="Step forward" onclick="pdaAnimStep(1)">&#8250;</button>
+        <button class="anim-btn" id="pda-anim-reset-btn" title="Reset" onclick="pdaAnimReset()" style="font-size:11px">&#8635;</button>
+        <div class="anim-step-info" id="pda-anim-step-info">step 0 / 0</div>
+        <span style="font-size:11px;color:var(--text3)">State:</span>
+        <div class="pda-state-badge" id="pda-state-badge">q₀</div>
+        <div style="flex:1"></div>
+        <div class="anim-chars" id="pda-anim-chars"></div>
+        <div class="anim-speed">
+          <span>Speed</span>
+          <input type="range" id="pda-speed-slider" min="1" max="5" value="3" oninput="updatePdaSpeed()"/>
+        </div>
+      </div>
+      <div class="pda-stack-row">
+        <span>Stack:</span>
+        <div class="pda-stack-cells" id="pda-stack-cells"></div>
+        <span id="pda-result-inline" style="margin-left:12px;font-size:12px;font-weight:600"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -596,6 +656,25 @@ body{font-family:var(--font);background:transparent;color:var(--text);min-height
     </div>
     <div class="modal-body">
       <div class="cfg-note" id="cfg-note"></div>
+
+      <!-- ── Derive Input ── -->
+      <div class="cfg-section">
+        <div class="cfg-section-title">Derive a String</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input
+            id="cfg-derive-input"
+            class="string-input"
+            type="text"
+            placeholder="e.g. aaba"
+            style="flex:1;font-size:13px;padding:8px 12px"
+            oninput="cfgDeriveInput()"
+            onkeydown="if(event.key==='Enter')cfgDerive()"
+          />
+          <button class="simulate-btn" onclick="cfgDerive()" style="white-space:nowrap">Derive ⇒</button>
+        </div>
+        <div id="cfg-derivation" style="margin-top:12px"></div>
+      </div>
+
       <div class="cfg-section">
         <div class="cfg-section-title">Production Rules</div>
         <div class="cfg-block" id="cfg-rules"></div>
@@ -723,9 +802,14 @@ const RE2 = {
 /* ═══════════════════════════════════════════════════════
    CFG DATA
    ═══════════════════════════════════════════════════════ */
+// Right-linear CFG — each state maps to a non-terminal variable.
+// Productions: for each DFA transition δ(q, a) = p  → Vq → a Vp
+//              for each accept state q                → Vq → ε
+// RE #1 state→variable map: 0→S, 1→A, 2→B, 3→C, 4→D, 5→E, 6→T, 7→F, 8→G
 const CFG_RE1 = {
   title: 'Context-free Grammar — RE #1',
-  note: 'Right-linear CFG derived from the DFA for RE #1 (alphabet {a, b}). Each non-terminal maps to a DFA state. The start variable S corresponds to q₀.',
+  stateVar: {0:'S',1:'A',2:'B',3:'C',4:'D',5:'E',6:'T',7:'F',8:'G'},
+  // All production rules (static grammar)
   rules: [
     ['S', 'aA | bB'],
     ['A', 'aC'],
@@ -733,28 +817,30 @@ const CFG_RE1 = {
     ['C', 'aD | bE'],
     ['D', 'aF | bF'],
     ['E', 'aG | bG'],
+    ['T', 'aT | bT'],
     ['F', 'aF | bF | ε'],
     ['G', 'aG | bG | ε'],
   ],
   formal: [
     'G = (V, Σ, P, S)',
-    'V = {S, A, B, C, D, E, F, G}',
+    'V = {S, A, B, C, D, E, T, F, G}',
     'Σ = {a, b}',
     'S = S  (start variable)',
     'P = productions above',
   ],
 };
 
+// RE #2 state→variable map: 0→S, 1→A, 2→B, 3→C, 4→D, 5→E, 6→F
 const CFG_RE2 = {
   title: 'Context-free Grammar — RE #2',
-  note: 'Right-linear CFG derived from the DFA for RE #2 (alphabet {0, 1}). Each non-terminal maps to a DFA state.',
+  stateVar: {0:'S',1:'A',2:'B',3:'C',4:'D',5:'E',6:'F'},
   rules: [
     ['S', '1A | 0B'],
-    ['A', '0C | 1C'],
-    ['B', '0C | 1C'],
-    ['C', '1D | 0E | 0C | 1C'],
-    ['D', '1F | 0D | 1D'],
-    ['E', '0F | 1E | 0E'],
+    ['A', '0C | 1D'],
+    ['B', '0E | 1A'],
+    ['C', '0D | 1F'],
+    ['D', '0E | 1F'],
+    ['E', '0F | 1A'],
     ['F', '0F | 1F | ε'],
   ],
   formal: [
@@ -765,6 +851,47 @@ const CFG_RE2 = {
     'P = productions above',
   ],
 };
+
+// Build derivation steps for the input string using the DFA transitions.
+// Returns array of step strings, or null if the string is invalid/empty.
+function buildCFGDerivation(input, reNum) {
+  const re = reNum === 1 ? RE1 : RE2;
+  const cfg = reNum === 1 ? CFG_RE1 : CFG_RE2;
+  if (!input || input.length === 0) return null;
+
+  // Walk the DFA
+  let state = re.startState;
+  const path = [state]; // states visited
+  for (const ch of input) {
+    const next = re.delta[state]?.[ch];
+    if (next === undefined) return null; // invalid symbol
+    state = next;
+    path.push(state);
+  }
+
+  // Build derivation steps:
+  // S ⇒ a A ⇒ aa C ⇒ ... ⇒ w ε  (rightmost/leftmost, same for right-linear)
+  const steps = [];
+  let derived = cfg.stateVar[path[0]]; // starts as 'S'
+  steps.push(derived);
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    const nextVar = cfg.stateVar[path[i + 1]];
+    const isLastChar = i === input.length - 1;
+    const isAccept = re.acceptStates.includes(path[i + 1]);
+
+    if (isLastChar && isAccept) {
+      // Replace variable with just the terminal (variable → ch ε → ch)
+      derived = derived.replace(cfg.stateVar[path[i]], ch);
+    } else {
+      derived = derived.replace(cfg.stateVar[path[i]], ch + ' ' + nextVar);
+    }
+    steps.push(derived);
+  }
+
+  return steps;
+}
 
 /* ═══════════════════════════════════════════════════════
    PDA DATA
@@ -804,6 +931,12 @@ let curRE = 1;
 let curFL = 'dfa';
 let currentPage = 'converter';
 let highlightedState = null;
+// PDA sim state (declared early so hidePdaAnimBar can reference them)
+let pdaSteps = [], pdaIdx = -1, pdaTimer = null, pdaDur = 600;
+// Stores SVG path-data strings for each PDA transition (key: "from→to")
+let pdaEdgePaths = {};
+// Stores {cx,cy} center of each flowchart node (key: nodeId string)
+let pdaNodeCenters = {};
 
 /* ═══════════════════════════════════════════════════════
    PAGE / RE / FL SWITCHING
@@ -837,6 +970,7 @@ function selectFL(fl) {
 
 function applyFL(fl) {
   resetSim();
+  hidePdaAnimBar();
   document.getElementById('dfa-view').style.display = fl==='dfa' ? 'flex' : 'none';
   document.getElementById('pda-view').style.display = fl==='pda' ? 'flex' : 'none';
 
@@ -1065,7 +1199,7 @@ function renderPDAFlowchart(reNum) {
   svgEl.innerHTML = '';
 
   // Fixed canvas — we use a viewBox so it scales cleanly
-  const VW = 820, VH = 580;
+  const VW = 820, VH = 640;
   svgEl.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
   svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
@@ -1078,11 +1212,26 @@ function renderPDAFlowchart(reNum) {
   };
 
   // ── SVG helpers ───────────────────────────────────────────────
+  // Reset edge/node registries for fresh render
+  pdaEdgePaths = {};
+  pdaNodeCenters = {};
+
   function mk(tag, attrs, parent) {
     const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
     for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,v);
     (parent||svgEl).appendChild(e);
     return e;
+  }
+  // Record a transition path for animation (converts line/path to d-string)
+  function regEdge(fromLabel, toLabel, tag, attrs) {
+    let d;
+    if(tag==='path') d = attrs.d;
+    else if(tag==='line') d = `M${attrs.x1},${attrs.y1} L${attrs.x2},${attrs.y2}`;
+    if(d) {
+      const key = fromLabel + '→' + toLabel;
+      if(!pdaEdgePaths[key]) pdaEdgePaths[key] = d;
+    }
+    return mk(tag, attrs);
   }
   function txt(x,y,str,color,size,weight,anchor) {
     mk('text',{x,y,'text-anchor':anchor||'middle','font-size':size||11,
@@ -1113,23 +1262,32 @@ function renderPDAFlowchart(reNum) {
 
   // ── Shape primitives ──────────────────────────────────────────
   // Pill terminal  (START / ACCEPT / REJECT)
-  function pill(cx,cy,label,col,filt) {
+  function pill(cx,cy,label,col,filt,nodeId) {
+    if(nodeId) pdaNodeCenters[nodeId] = {cx, cy};
+    const g = mk('g', nodeId ? {'data-node':nodeId} : {});
     const w=88,h=30,rx=15;
     const r=mk('rect',{x:cx-w/2,y:cy-h/2,width:w,height:h,rx,
-      fill:col+'28',stroke:col,'stroke-width':2});
+      fill:col+'28',stroke:col,'stroke-width':2}, g);
     if(filt) r.setAttribute('filter',`url(#${filt})`);
-    txt(cx,cy+4.5,label,col,11,'700');
+    mk('text',{x:cx,y:cy+4.5,'text-anchor':'middle','font-size':11,
+      'font-family':"'Segoe UI',system-ui,sans-serif",
+      'font-weight':'700',fill:col}, g).textContent=label;
+    return g;
   }
 
   // Diamond  (READ decision)
-  function diamond(cx,cy,label,sub,col) {
+  function diamond(cx,cy,label,sub,col,nodeId) {
+    if(nodeId) pdaNodeCenters[nodeId] = {cx, cy};
     const hw=58,hh=32;
+    const g = mk('g', nodeId ? {'data-node':nodeId} : {});
     mk('polygon',{
       points:`${cx},${cy-hh} ${cx+hw},${cy} ${cx},${cy+hh} ${cx-hw},${cy}`,
-      fill:col+'18',stroke:col,'stroke-width':1.8});
-    txt(cx,cy-2,label,C.text,10,'600');
-    if(sub) txt(cx,cy+11,sub,C.text2,9,'400');
-    return {cx,cy,hw,hh};
+      fill:col+'18',stroke:col,'stroke-width':1.8}, g);
+    mk('text',{x:cx,y:cy-2,'text-anchor':'middle','font-size':10,
+      'font-family':"'Segoe UI',system-ui,sans-serif",'font-weight':'600',fill:C.text},g).textContent=label;
+    if(sub) mk('text',{x:cx,y:cy+11,'text-anchor':'middle','font-size':9,
+      'font-family':"'Segoe UI',system-ui,sans-serif",'font-weight':'400',fill:C.text2},g).textContent=sub;
+    return {cx,cy,hw,hh,g};
   }
 
   // Straight arrow (vertical or horizontal)
@@ -1202,189 +1360,243 @@ function renderPDAFlowchart(reNum) {
   //  q5 -ε↓ ACCEPT
 
   if(reNum===1){
-    const L=155, M=430, R=705;
-    const y0=40, y1=130, y2=240, y3=340, y4=440, y5=530;
-    const hw=58,hh=32, pw=88,ph=30;
+    // Compact layout — all within 820x640 viewBox
+    // Columns: L=175 (left), M=410 (centre), R=645 (right)
+    // REJECT pills sit inline vertically at each read node, not off-screen to sides
+    const L=175, M=410, R=645;
+    const y0=36, y1=120, y2=220, y2r=290, y3=380, y4=470, y5=570;
+    const hw=58, hh=32, pw=88, ph=30;
 
-    // START
-    pill(M,y0,'START',C.purple,'gp');
+    // START (centre top)
+    pill(M, y0, 'START', C.purple, 'gp', 'start');
     vArrow(M, y0+ph/2, y1-hh);
 
-    // q0
-    diamond(M,y1,'READ','q₀',C.purple2);
-    // q0 -ε→ REJECT (straight down centre)
-    vArrow(M, y1+hh, y2-ph/2);
-    lbl(M+14, (y1+hh+y2-ph/2)/2, 'ε');
-    pill(M,y2,'REJECT',C.red,'gr');
+    // q0 (centre)
+    diamond(M, y1, 'READ', 'q₀', C.purple2, 'q0');
 
-    // q0 -a→ q1 (right): elbow right then down
-    elbowRightDown(M+hw, y1, R, y2-hh);
-    lbl((M+hw+R)/2, y1-12, 'a');
+    // q0 -a→ q1 (right elbow)
+    mk('path',{d:`M${M+hw},${y1} H${R} V${y2-hh-1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl((M+hw+R)/2, y1-13, 'a');
 
-    // q0 -b→ q2 (left): elbow left then down
-    elbowRightDown(M-hw, y1, L, y2-hh);
-    lbl((M-hw+L)/2, y1-12, 'b');
+    // q0 -b→ q2 (left elbow)
+    mk('path',{d:`M${M-hw},${y1} H${L} V${y2-hh-1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl((M-hw+L)/2, y1-13, 'b');
 
-    // q1 (right col)
-    diamond(R,y2,'READ','q₁',C.purple2);
-    // q1 -b→ REJECT (right)
-    hArrow(y2, R+hw, R+hw+56);
-    lbl(R+hw+28, y2-12, 'b');
-    pill(R+hw+56+pw/2, y2,'REJECT',C.red,'gr');
-    // q1 -a→ elbow down-left to q3
-    elbowDownRight(R, y2+hh, M+hw, y3);
-    lbl(R+14, (y2+hh+y3)/2, 'a');
+    // q0 REJECT pill for ε — place it below q0 between y1 and y2
+    // Use a small reject below q0 to show the "stuck on ε" case
+    // (not an actual PDA path, skip drawing it — the PDA only moves on a/b)
 
-    // q2 (left col)
-    diamond(L,y2,'READ','q₂',C.purple2);
-    // q2 -a→ REJECT (left)
-    hArrow(y2, L-hw, L-hw-56);
-    lbl(L-hw-28, y2-12, 'a');
-    pill(L-hw-56-pw/2, y2,'REJECT',C.red,'gr');
-    // q2 -b→ elbow down-right to q3
-    elbowDownRight(L, y2+hh, M-hw, y3);
-    lbl(L-14, (y2+hh+y3)/2, 'b');
+    // q1 (right col, row2)
+    diamond(R, y2, 'READ', 'q₁', C.purple2, 'q1');
+    // q1 -b→ REJECT (below q1, compact)
+    vArrow(R, y2+hh, y2r-ph/2);
+    lbl(R+14, y2+hh+14, 'b');
+    pill(R, y2r, 'REJECT', C.red, 'gr', 'reject-q1');
+    // q1 -a→ q3 (down then left to centre)
+    mk('path',{d:`M${R},${y2r+ph/2} V${y3} H${M+hw+1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl(R+14, y2r+ph/2+18, 'a');
 
-    // q3 (centre)
-    diamond(M,y3,'READ','q₃',C.purple2);
-    // q3 -a→ q4 (right)
-    elbowRightDown(M+hw, y3, R, y4-hh);
-    lbl((M+hw+R)/2, y3-12, 'a');
-    // q3 -b→ q5 (left)
-    elbowRightDown(M-hw, y3, L, y4-hh);
-    lbl((M-hw+L)/2, y3-12, 'b');
+    // q2 (left col, row2)
+    diamond(L, y2, 'READ', 'q₂', C.purple2, 'q2');
+    // q2 -a→ REJECT (below q2, compact)
+    vArrow(L, y2+hh, y2r-ph/2);
+    lbl(L-14, y2+hh+14, 'a');
+    pill(L, y2r, 'REJECT', C.red, 'gr', 'reject-q2');
+    // q2 -b→ q3 (down then right to centre)
+    mk('path',{d:`M${L},${y2r+ph/2} V${y3} H${M-hw-1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl(L-14, y2r+ph/2+18, 'b');
 
-    // q4 (right)
-    diamond(R,y4,'READ','q₄',C.purple2);
-    selfLoopAbove(R,y4,hh,hw,'a, b');
+    // q3 (centre row3)
+    diamond(M, y3, 'READ', 'q₃', C.purple2, 'q3');
+    // q3 -a→ q4 (right elbow)
+    mk('path',{d:`M${M+hw},${y3} H${R} V${y4-hh-1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl((M+hw+R)/2, y3-13, 'a');
+    // q3 -b→ q5 (left elbow)
+    mk('path',{d:`M${M-hw},${y3} H${L} V${y4-hh-1}`,
+      fill:'none',stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
+    lbl((M-hw+L)/2, y3-13, 'b');
+
+    // q4 (right, row4)
+    diamond(R, y4, 'READ', 'q₄', C.purple2, 'q4');
+    selfLoopAbove(R, y4, hh, hw, 'a,b');
     // q4 -ε↓ ACCEPT
     vArrow(R, y4+hh, y5-ph/2);
     lbl(R+14, (y4+hh+y5-ph/2)/2, 'ε');
-    pill(R,y5,'ACCEPT',C.green,'gg');
+    pill(R, y5, 'ACCEPT', C.green, 'gg', 'accept-q4');
 
-    // q5 (left)
-    diamond(L,y4,'READ','q₅',C.purple2);
-    selfLoopAbove(L,y4,hh,hw,'a, b');
+    // q5 (left, row4)
+    diamond(L, y4, 'READ', 'q₅', C.purple2, 'q5');
+    selfLoopAbove(L, y4, hh, hw, 'a,b');
     // q5 -ε↓ ACCEPT
     vArrow(L, y4+hh, y5-ph/2);
     lbl(L-14, (y4+hh+y5-ph/2)/2, 'ε');
-    pill(L,y5,'ACCEPT',C.green,'gg');
+    pill(L, y5, 'ACCEPT', C.green, 'gg', 'accept-q5');
 
   } else {
-    // ── RE #2 clean grid ──────────────────────────────────────
-    // Layout (all right-angle lines, no curves):
+    // ── RE #2 PDA Flowchart ───────────────────────────────────
     //
-    //  col:  xL=140  xM=430  xR=720
+    // Correct transitions from PDA_RE2 table:
+    //   q₀ : 1→q₁,  0→q₂,  ε→REJECT
+    //   q₁ : 0,1→q₃  (both)
+    //   q₂ : 0,1→q₃  (both)
+    //   q₃ : 1→q₄,  0→q₅
+    //   q₄ : 1→q₆,  0→q₄  (self-loop)
+    //   q₅ : 0→q₆,  1→q₅  (self-loop)
+    //   q₆ : ACCEPT (0,1 self-loop)
     //
-    //  y=40   [START]  (centre)
-    //  y=120  READ q0  (centre)
-    //  y=230  READ q2(L)   REJECT(M)   READ q1(R)
-    //  y=340  READ q5(L)   READ q4(M)  READ q3(R)
-    //  y=450  ACCEPT(L)    ACCEPT(M)   ACCEPT(R)
+    // Layout — single centre column, top-to-bottom flow:
     //
-    //  Forward edges (all elbows or straight):
-    //    q0 -1→ q1  (elbow right-down)
-    //    q0 -0→ q2  (elbow left-down)
-    //    q0 -ε→ REJECT (straight down)
-    //    q1 -1→ q3  (straight down)
-    //    q1 -0→ q4  (elbow left-down, offset right of centre line)
-    //    q2 -0→ q5  (straight down)
-    //    q3 -1→ ACCEPT(R) (straight down)
-    //    q3 -0→ q4  (straight left)
-    //    q4 -1→ ACCEPT(M) (straight down)
-    //    q4 -0→ q5  (straight left)
-    //    q5 -0→ ACCEPT(L) (straight down)
+    //   xC=380  (centre)
+    //   xL=160  (left branch)
+    //   xR=600  (right branch)
     //
-    //  Back edges (routed around outside, all right-angle):
-    //    q2 -1→ q1  : up from q2 top, across above q0 row, down to q1 top
-    //    q5 -1→ q1  : right from q5, up outside right, down to q1 top
+    //   row0  y=45   START
+    //   row1  y=120  q₀  (diamond)
+    //   row2  y=220  q₂(xL)   REJECT(xC)   q₁(xR)
+    //   row3  y=330  q₃  (diamond, centre)
+    //   row4  y=430  q₅(xL)              q₄(xR)
+    //   row5  y=530  ACCEPT(xC)
+    //
+    //   Arrows:
+    //     START → q₀  straight down
+    //     q₀ →ε REJECT  straight down
+    //     q₀ →1 q₁  elbow right→down
+    //     q₀ →0 q₂  elbow left→down
+    //     q₁ →0,1 q₃  elbow left→down  (enters q₃ from right tip)
+    //     q₂ →0,1 q₃  elbow right→down (enters q₃ from left tip)
+    //     q₃ →1 q₄  elbow right→down
+    //     q₃ →0 q₅  elbow left→down
+    //     q₄ →0 q₄  self-loop (right side)
+    //     q₄ →1 ACCEPT  elbow left→down
+    //     q₅ →1 q₅  self-loop (left side)
+    //     q₅ →0 ACCEPT  elbow right→down
+    //     ACCEPT →0,1 self-loop (top)
 
-    const xL=140, xM=430, xR=720;
-    const y0=40, y1=120, y2=230, y3=340, y4=450, y5=530;
+    const xC=380, xL=160, xR=600;
+    const y0=45, y1=120, y2=220, y3=330, y4=430, y5=530;
     const hw=58, hh=32, pw=92, ph=30;
+    const S = C.text3; // stroke colour
+    const SW = '1.4';  // stroke-width
 
-    // START
-    pill(xM,y0,'START',C.purple,'gp');
-    vArrow(xM,y0+ph/2,y1-hh);
+    function arrow(x1,y1,x2,y2) {
+      // Straight arrow with arrowhead, stops just before destination
+      mk('line',{x1,y1,x2,y2,stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    }
 
-    // q0
-    diamond(xM,y1,'READ','q₀',C.purple2);
-    // q0 -ε→ REJECT straight down
-    vArrow(xM,y1+hh,y2-ph/2);
-    lbl(xM+16,(y1+hh+y2-ph/2)/2,'ε');
-    pill(xM,y2,'REJECT',C.red,'gr');
-    // q0 -1→ q1 elbow right-down
-    elbowRightDown(xM+hw,y1,xR,y2-hh);
-    lbl((xM+hw+xR)/2,y1-13,'1');
-    // q0 -0→ q2 elbow left-down
-    elbowRightDown(xM-hw,y1,xL,y2-hh);
-    lbl((xM-hw+xL)/2,y1-13,'0');
+    // ── START ──────────────────────────────────────────────────
+    pill(xC, y0, 'START', C.purple, 'gp');
+    // START → q₀
+    arrow(xC, y0+ph/2, xC, y1-hh-1);
+    // label count from START
+    txt(xC+14, (y0+ph/2+y1-hh)/2, '', C.text3, 0);
 
-    // q1 (right col)
-    diamond(xR,y2,'READ','q₁',C.purple2);
-    // q1 -1→ q3 straight down
-    vArrow(xR,y2+hh,y3-hh);
-    lbl(xR+16,(y2+hh+y3-hh)/2,'1');
-    // q1 -0→ q4 elbow: down then left (route offset so it doesn't overlap the straight line)
-    // Exit from left tip of q1, go left to xM+hw, then down to q3 row
-    mk('line',{x1:xR-hw,y1:y2, x2:xM+hw+20,y2:y2,
-      stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:xM+hw+20,y1:y2, x2:xM+hw+20,y2:y3,
-      stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:xM+hw+20,y1:y3, x2:xM+hw+1,y2:y3,
-      stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
-    lbl(xR-hw-28,y2-13,'0');
+    // ── q₀ (centre, row1) ─────────────────────────────────────
+    diamond(xC, y1, 'READ', 'q₀', C.purple2, 'q0');
 
-    // q2 (left col)
-    diamond(xL,y2,'READ','q₂',C.purple2);
-    // q2 -0→ q5 straight down
-    vArrow(xL,y2+hh,y3-hh);
-    lbl(xL-16,(y2+hh+y3-hh)/2,'0');
-    // q2 -1→ q1 back-edge: up from q2 top → right across above y1 → down to q1 top
-    const backY = y1-55;   // route above q0 row
-    mk('line',{x1:xL,y1:y2-hh,  x2:xL,      y2:backY,   stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:xL,y1:backY,   x2:xR,      y2:backY,   stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:xR,y1:backY,   x2:xR,      y2:y2-hh-1, stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
-    lbl((xL+xR)/2, backY-12, '1');
+    // q₀ →ε REJECT (straight down, centre)
+    arrow(xC, y1+hh+1, xC, y2-ph/2-1);
+    lbl(xC+16, (y1+hh + y2-ph/2)/2, 'ε');
+    pill(xC, y2, 'REJECT', C.red, 'gr', 'reject');
 
-    // q3 (right col)
-    diamond(xR,y3,'READ','q₃',C.purple2);
-    // q3 -1→ ACCEPT straight down
-    vArrow(xR,y3+hh,y4-ph/2);
-    lbl(xR+16,(y3+hh+y4-ph/2)/2,'1');
-    pill(xR,y4,'ACCEPT',C.green,'gg');
-    // q3 -0→ q4 straight left
-    hArrow(y3,xR-hw,xM+hw);
-    lbl((xR-hw+xM+hw)/2,y3-13,'0');
+    // q₀ →1 q₁ (elbow: right from q₀ right-tip → down to q₁ top)
+    mk('path',{d:`M${xC+hw},${y1} H${xR} V${y2-hh-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xC+hw+xR)/2, y1-14, '1');
 
-    // q4 (centre col)
-    diamond(xM,y3,'READ','q₄',C.purple2);
-    // q4 -1→ ACCEPT straight down
-    vArrow(xM,y3+hh,y4-ph/2);
-    lbl(xM+16,(y3+hh+y4-ph/2)/2,'1');
-    pill(xM,y4,'ACCEPT',C.green,'gg');
-    // q4 -0→ q5 straight left
-    hArrow(y3,xM-hw,xL+hw);
-    lbl((xM-hw+xL+hw)/2,y3-13,'0');
+    // q₀ →0 q₂ (elbow: left from q₀ left-tip → down to q₂ top)
+    mk('path',{d:`M${xC-hw},${y1} H${xL} V${y2-hh-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xC-hw+xL)/2, y1-14, '0');
 
-    // q5 (left col)
-    diamond(xL,y3,'READ','q₅',C.purple2);
-    // q5 -0→ ACCEPT straight down
-    vArrow(xL,y3+hh,y4-ph/2);
-    lbl(xL-16,(y3+hh+y4-ph/2)/2,'0');
-    pill(xL,y4,'ACCEPT',C.green,'gg');
-    // q5 -1→ q1 back-edge: right from q5 → up outside right edge → down to q1 top
-    const farR = xR+70;  // outside right of diagram
-    mk('line',{x1:xL+hw,y1:y3,   x2:farR,    y2:y3,      stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:farR, y1:y3,   x2:farR,    y2:y2-hh-20,stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:farR, y1:y2-hh-20, x2:xR,  y2:y2-hh-20,stroke:C.text3,'stroke-width':1.4});
-    mk('line',{x1:xR,   y1:y2-hh-20, x2:xR,  y2:y2-hh-1, stroke:C.text3,'stroke-width':1.4,'marker-end':'url(#a)'});
-    lbl(farR+14,(y3+y2)/2,'1');
+    // ── q₁ (right, row2) ──────────────────────────────────────
+    diamond(xR, y2, 'READ', 'q₁', C.purple2, 'q1');
+
+    // q₁ →0,1 q₃ (elbow: down from q₁ bottom → left to q₃ right-tip)
+    mk('path',{d:`M${xR},${y2+hh} V${y3} H${xC+hw+1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl(xR+16, (y2+hh+y3)/2, '0,1');
+
+    // ── q₂ (left, row2) ───────────────────────────────────────
+    diamond(xL, y2, 'READ', 'q₂', C.purple2, 'q2');
+
+    // q₂ →0,1 q₃ (elbow: down from q₂ bottom → right to q₃ left-tip)
+    mk('path',{d:`M${xL},${y2+hh} V${y3} H${xC-hw-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl(xL-16, (y2+hh+y3)/2, '0,1');
+
+    // ── q₃ (centre, row3) ─────────────────────────────────────
+    diamond(xC, y3, 'READ', 'q₃', C.purple2, 'q3');
+
+    // q₃ →1 q₄ (elbow: right from q₃ right-tip → down to q₄ top)
+    mk('path',{d:`M${xC+hw},${y3} H${xR} V${y4-hh-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xC+hw+xR)/2, y3-14, '1');
+
+    // q₃ →0 q₅ (elbow: left from q₃ left-tip → down to q₅ top)
+    mk('path',{d:`M${xC-hw},${y3} H${xL} V${y4-hh-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xC-hw+xL)/2, y3-14, '0');
+
+    // ── q₄ (right, row4) ──────────────────────────────────────
+    diamond(xR, y4, 'READ', 'q₄', C.purple2, 'q4');
+
+    // q₄ →0 self-loop (right side of diamond)
+    {
+      const ex = xR+hw, lx2 = ex+44, yt = y4-14, yb = y4+14;
+      mk('line',{x1:ex,y1:yt, x2:lx2,y2:yt, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2,y1:yt, x2:lx2,y2:yb, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2,y1:yb, x2:ex+1,y2:yb, stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+      lbl(lx2+22, y4, '0');
+    }
+
+    // q₄ →1 ACCEPT (elbow: left from q₄ left-tip → down to ACCEPT top)
+    mk('path',{d:`M${xR-hw},${y4} H${xC} V${y5-ph/2-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xR-hw+xC)/2, y4-14, '1');
+
+    // ── q₅ (left, row4) ───────────────────────────────────────
+    diamond(xL, y4, 'READ', 'q₅', C.purple2, 'q5');
+
+    // q₅ →1 self-loop (left side of diamond)
+    {
+      const ex = xL-hw, lx2 = ex-44, yt = y4-14, yb = y4+14;
+      mk('line',{x1:ex,y1:yt, x2:lx2,y2:yt, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2,y1:yt, x2:lx2,y2:yb, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2,y1:yb, x2:ex-1,y2:yb, stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+      lbl(lx2-22, y4, '1');
+    }
+
+    // q₅ →0 ACCEPT (elbow: right from q₅ right-tip → down to ACCEPT top)
+    mk('path',{d:`M${xL+hw},${y4} H${xC} V${y5-ph/2-1}`,
+      fill:'none',stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+    lbl((xL+hw+xC)/2, y4-14, '0');
+
+    // ── ACCEPT (centre, row5) ──────────────────────────────────
+    pill(xC, y5, 'ACCEPT', C.green, 'gg', 'accept');
+
+    // ACCEPT →0,1 self-loop (top of pill)
+    {
+      const px = xC, py = y5-ph/2;
+      const lx2 = xC+70, loopY = py-28;
+      mk('line',{x1:px+pw/4, y1:py, x2:px+pw/4, y2:loopY, stroke:S,'stroke-width':SW});
+      mk('line',{x1:px+pw/4, y1:loopY, x2:lx2, y2:loopY, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2, y1:loopY, x2:lx2, y2:py+4, stroke:S,'stroke-width':SW});
+      mk('line',{x1:lx2, y1:py+4, x2:px+pw/2+1, y2:py+4, stroke:S,'stroke-width':SW,'marker-end':'url(#a)'});
+      lbl(lx2+22, loopY+14, '0,1');
+    }
   }
 
-  // ── Legend ────────────────────────────────────────────────────
-  const lx=VW-138, ly=16;
-  mk('rect',{x:lx-8,y:ly,width:136,height:90,rx:7,
+  // ── Build edge path registry for animation ──────────────────
+  buildPdaEdgePaths(reNum);
+
+  // ── Legend (top-right, always clear of diagram content) ────────
+  const lx=VW-130, ly=8;
+  mk('rect',{x:lx-8,y:ly,width:128,height:90,rx:7,
     fill:C.bg,stroke:C.border,'stroke-width':1});
   [
     {c:C.purple, s:'START'},
@@ -1397,12 +1609,80 @@ function renderPDAFlowchart(reNum) {
   });
 }
 
+// ── Pre-compute SVG path d-strings for each PDA state transition ──
+function buildPdaEdgePaths(reNum) {
+  pdaEdgePaths = {};
+  const reg = (from, to, d) => { pdaEdgePaths[from + '→' + to] = d; };
+
+  if(reNum === 1) {
+    // Must match new RE#1 layout constants
+    const L=175, M=410, R=645;
+    const y1=120, y2=220, y2r=290, y3=380, y4=470, y5=570;
+    const hw=58, hh=32, ph=30;
+    // q0→q1 right elbow
+    reg('q₀','q₁', `M${M+hw},${y1} H${R} V${y2-hh}`);
+    // q0→q2 left elbow
+    reg('q₀','q₂', `M${M-hw},${y1} H${L} V${y2-hh}`);
+    // q1→qT (b → REJECT, straight down from q1)
+    reg('q₁','qT', `M${R},${y2+hh} V${y2r-ph/2}`);
+    // q1→q3 (a: from below REJECT pill down then left)
+    reg('q₁','q₃', `M${R},${y2r+ph/2} V${y3} H${M+hw}`);
+    // q2→qT (a → REJECT, straight down from q2)
+    reg('q₂','qT', `M${L},${y2+hh} V${y2r-ph/2}`);
+    // q2→q3 (b: from below REJECT pill down then right)
+    reg('q₂','q₃', `M${L},${y2r+ph/2} V${y3} H${M-hw}`);
+    // q3→q4 right elbow
+    reg('q₃','q₄', `M${M+hw},${y3} H${R} V${y4-hh}`);
+    // q3→q5 left elbow
+    reg('q₃','q₅', `M${M-hw},${y3} H${L} V${y4-hh}`);
+    // q4 self-loop (right side)
+    reg('q₄','q₄', `M${R+hw},${y4-14} H${R+hw+40} V${y4+14} H${R+hw}`);
+    // q5 self-loop (right side of L diamond)
+    reg('q₅','q₅', `M${L+hw},${y4-14} H${L+hw+40} V${y4+14} H${L+hw}`);
+    // q4→ACCEPT straight down
+    reg('q₄','q₄_accept', `M${R},${y4+hh} V${y5-ph/2}`);
+    // q5→ACCEPT straight down
+    reg('q₅','q₅_accept', `M${L},${y4+hh} V${y5-ph/2}`);
+
+  } else {
+    const xC=380, xL=160, xR=600;
+    const y1=120, y2=220, y3=330, y4=430, y5=530;
+    const hw=58, hh=32, ph=30;
+    // q0→q1 right elbow
+    reg('q₀','q₁', `M${xC+hw},${y1} H${xR} V${y2-hh}`);
+    // q0→q2 left elbow
+    reg('q₀','q₂', `M${xC-hw},${y1} H${xL} V${y2-hh}`);
+    // q0→REJECT ε straight down
+    reg('q₀','q₀_rej', `M${xC},${y1+hh} V${y2-ph/2}`);
+    // q1→q3 down then left
+    reg('q₁','q₃', `M${xR},${y2+hh} V${y3} H${xC+hw}`);
+    // q2→q3 down then right
+    reg('q₂','q₃', `M${xL},${y2+hh} V${y3} H${xC-hw}`);
+    // q3→q4 right elbow
+    reg('q₃','q₄', `M${xC+hw},${y3} H${xR} V${y4-hh}`);
+    // q3→q5 left elbow
+    reg('q₃','q₅', `M${xC-hw},${y3} H${xL} V${y4-hh}`);
+    // q4 self-loop right side (ex=xR+hw=658, lx2=702)
+    reg('q₄','q₄', `M${xR+hw},${y4-14} H${xR+hw+44} V${y4+14} H${xR+hw}`);
+    // q5 self-loop left side (ex=xL-hw=102, lx2=58)
+    reg('q₅','q₅', `M${xL-hw},${y4-14} H${xL-hw-44} V${y4+14} H${xL-hw}`);
+    // q4→ACCEPT left elbow then down (xR-hw to xC)
+    reg('q₄','q₆', `M${xR-hw},${y4} H${xC} V${y5-ph/2}`);
+    // q5→ACCEPT right elbow then down (xL+hw to xC)
+    reg('q₅','q₆', `M${xL+hw},${y4} H${xC} V${y5-ph/2}`);
+    // q6 self-loop (top of ACCEPT pill)
+    reg('q₆','q₆', `M${xC+23},${y5-ph/2} V${y5-ph/2-28} H${xC+70} V${y5+4} H${xC+46}`);
+  }
+}
+
 function renderPDA(reNum) {
   const rows = reNum===1 ? PDA_RE1 : PDA_RE2;
   const tbody = document.getElementById('pda-tbody');
   tbody.innerHTML = '';
-  for(const [state,inp,stk,nstate,op] of rows) {
+  for(let i=0; i<rows.length; i++) {
+    const [state,inp,stk,nstate,op] = rows[i];
     const tr = document.createElement('tr');
+    tr.setAttribute('data-row', i);
     tr.innerHTML = `
       <td class="pda-state">${state}</td>
       <td class="pda-sym">${inp}</td>
@@ -1420,21 +1700,105 @@ function renderPDA(reNum) {
 function openCFG() {
   const cfg = curRE===1 ? CFG_RE1 : CFG_RE2;
   document.getElementById('cfg-modal-title').textContent = cfg.title;
-  document.getElementById('cfg-note').textContent = cfg.note;
 
-  const rulesEl = document.getElementById('cfg-rules');
-  rulesEl.innerHTML = cfg.rules.map(([nt,rule])=>
+  // ── Note ──────────────────────────────────────────────────────
+  document.getElementById('cfg-note').innerHTML =
+    'Right-linear CFG derived from the DFA for RE #' + curRE +
+    '. Each non-terminal maps to a DFA state. The start variable <span class="nt">S</span> corresponds to q₀.';
+
+  // ── Production Rules ──────────────────────────────────────────
+  document.getElementById('cfg-rules').innerHTML = cfg.rules.map(([nt,rule])=>
     `<span class="nt">${nt}</span> <span class="arrow">→</span> ${
       rule.replace(/ε/g,`<span class='eps'>ε</span>`)
     }`
   ).join('<br>');
 
-  const formalEl = document.getElementById('cfg-formal');
-  formalEl.innerHTML = cfg.formal.map(l=>
+  // ── Formal Definition ─────────────────────────────────────────
+  document.getElementById('cfg-formal').innerHTML = cfg.formal.map(l=>
     l.replace(/\{[^}]+\}/g, m=>`<span class='nt'>${m}</span>`)
   ).join('<br>');
 
+  // ── Reset derivation area & pre-fill from main input if present ──
+  const mainInput = document.getElementById('string-input').value.trim();
+  const deriveInput = document.getElementById('cfg-derive-input');
+  if (mainInput) {
+    deriveInput.value = mainInput;
+    cfgDerive();
+  } else {
+    deriveInput.value = '';
+    document.getElementById('cfg-derivation').innerHTML = '';
+  }
+
   document.getElementById('cfg-modal').classList.add('open');
+}
+
+function cfgDeriveInput() {
+  // Clear result while typing
+  document.getElementById('cfg-derivation').innerHTML = '';
+}
+
+function cfgDerive() {
+  const input = document.getElementById('cfg-derive-input').value.trim();
+  const out = document.getElementById('cfg-derivation');
+
+  if (!input) {
+    out.innerHTML = '';
+    return;
+  }
+
+  const re = curRE===1 ? RE1 : RE2;
+  const steps = buildCFGDerivation(input, curRE);
+
+  // Check accept
+  let state = re.startState, valid = true;
+  for (const ch of input) {
+    const next = re.delta[state]?.[ch];
+    if (next === undefined) { valid = false; break; }
+    state = next;
+  }
+  const accepted = valid && re.acceptStates.includes(state);
+
+  if (!steps) {
+    out.innerHTML = `<span style="color:var(--red);font-size:12px">⚠ Symbol outside alphabet — no derivation possible.</span>`;
+    return;
+  }
+
+  // Render steps
+  const lines = steps.map((s, i) => {
+    const tokens = s.split(' ').map(tok => {
+      if (/^[A-Z]$/.test(tok)) return `<span class="nt">${tok}</span>`;
+      if (tok === 'ε') return `<span class="eps">ε</span>`;
+      return `<span class="term">${tok}</span>`;
+    });
+    const arrow = i === 0
+      ? `<span class="arrow" style="visibility:hidden">⇒</span>`
+      : `<span class="arrow">⇒</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px">${arrow}<span>${tokens.join(' ')}</span></div>`;
+  });
+
+  const badge = accepted
+    ? `<div style="margin-top:10px;padding:6px 14px;border-radius:20px;display:inline-block;background:rgba(62,207,110,.15);border:1px solid var(--green);color:var(--green);font-size:12px;font-weight:600">✓ ACCEPTED — string is generated by the grammar</div>`
+    : `<div style="margin-top:10px;padding:6px 14px;border-radius:20px;display:inline-block;background:rgba(232,85,85,.15);border:1px solid var(--red);color:var(--red);font-size:12px;font-weight:600">✗ REJECTED — string is not in the language</div>`;
+
+  out.innerHTML = `<div class="cfg-block" style="line-height:2.2;font-size:12.5px;padding:12px 16px">${lines.join('')}</div>${badge}`;
+}
+
+function renderDerivationSteps(steps, accepted) {
+  const lines = steps.map((s, i) => {
+    const tokens = s.split(' ').map(tok => {
+      if (/^[A-Z]$/.test(tok)) return `<span class="nt">${tok}</span>`;
+      if (tok === 'ε') return `<span class="eps">ε</span>`;
+      return `<span class="term">${tok}</span>`;
+    });
+    const prefix = i === 0
+      ? '<span class="arrow" style="visibility:hidden">⇒</span> '
+      : '<span class="arrow">⇒</span> ';
+    return prefix + tokens.join(' ');
+  });
+  const result = accepted
+    ? `<span style="color:var(--green);font-size:11px">✓ String accepted by the grammar</span>`
+    : `<span style="color:var(--red);font-size:11px">✗ String not in the language</span>`;
+  return `<div style="margin-top:10px;line-height:2.2;font-family:'Courier New',monospace;font-size:12.5px">${lines.join('<br>')}</div><div style="margin-top:8px">${result}</div>`;
 }
 
 function closeCFG(e) {
@@ -1453,6 +1817,7 @@ function hideAnimBar() {
   stopPlay();
   animPath = []; animInp = ''; animRE = null; animIdx = -1;
   document.getElementById('anim-bar').classList.remove('visible');
+  hidePdaAnimBar();
 }
 
 function onInputChange() {
@@ -1470,10 +1835,15 @@ function resetSim() {
 }
 
 function simulate() {
-  if(curFL !== 'dfa') {
-    // for CFG/PDA just validate and show badge
+  if(curFL === 'cfg') {
     const inp = document.getElementById('string-input').value;
     validateAndBadge(inp);
+    return;
+  }
+
+  if(curFL === 'pda') {
+    const inp = document.getElementById('string-input').value;
+    runPDASim(inp);
     return;
   }
 
@@ -1860,6 +2230,343 @@ function addPulseRing(svg, st) {
   ring.setAttribute('opacity', '0.8');
   ring.classList.add('state-pulse', 'edge-flash');
   svg.appendChild(ring);
+}
+
+/* ═══════════════════════════════════════════════════════
+   PDA SIMULATION ENGINE
+   ═══════════════════════════════════════════════════════ */
+
+// Build a lookup: state+symbol → {newState, rowIndex}
+// Handles multi-symbol rules like 'a,b' or '0,1'
+function buildPdaDelta(rows) {
+  const delta = {};
+  for(let i=0; i<rows.length; i++) {
+    const [state, inp, , nstate] = rows[i];
+    const state_key = state.replace(/[₀-₉]/g, d => '0123456789'['₀₁₂₃₄₅₆₇₈₉'.indexOf(d)]);
+    const syms = inp.split(',').map(s=>s.trim());
+    if(!delta[state]) delta[state] = {};
+    for(const sym of syms) {
+      delta[state][sym] = { next: nstate, row: i };
+    }
+  }
+  return delta;
+}
+
+// Map PDA state label → flowchart nodeId
+// RE1: q₀→q0, q₁→q1 ... qT→qT, REJECT nodes
+// RE2: q₀→q0 ... q₆→accept
+function pdaStateToNode(stateLabel, reNum) {
+  const map1 = {
+    'q₀':'q0','q₁':'q1','q₂':'q2','q₃':'q3',
+    'q₄':'q4','q₅':'q5','qT':'reject-q1',
+  };
+  const map2 = {
+    'q₀':'q0','q₁':'q1','q₂':'q2','q₃':'q3',
+    'q₄':'q4','q₅':'q5','q₆':'accept',
+  };
+  return (reNum===1 ? map1 : map2)[stateLabel] || null;
+}
+
+// Determine if a PDA state is accepting
+function isPdaAccept(stateLabel, reNum) {
+  if(reNum===1) return ['q₄','q₅'].includes(stateLabel);
+  if(reNum===2) return stateLabel==='q₆';
+  return false;
+}
+function isPdaReject(stateLabel, reNum) {
+  if(reNum===1) return stateLabel==='qT';
+  return false;
+}
+
+// PDA anim state
+const PDA_SPEED_MAP = [1100,800,600,380,200];
+
+function updatePdaSpeed() {
+  const v = parseInt(document.getElementById('pda-speed-slider').value,10);
+  pdaDur = PDA_SPEED_MAP[v-1];
+}
+
+function hidePdaAnimBar() {
+  if(typeof pdaStopPlay==='function') pdaStopPlay();
+  pdaSteps=[]; pdaIdx=-1;
+  const bar=document.getElementById('pda-anim-bar');
+  if(bar) bar.classList.remove('visible');
+  // clear flowchart highlights
+  document.querySelectorAll('#pda-svg [data-node]').forEach(g => {
+    g.querySelectorAll('polygon,rect').forEach(s => {
+      if(s.dataset.origStroke !== undefined) { s.setAttribute('stroke', s.dataset.origStroke); delete s.dataset.origStroke; }
+      if(s.dataset.origSw !== undefined)     { s.setAttribute('stroke-width', s.dataset.origSw); delete s.dataset.origSw; }
+      s.removeAttribute('filter');
+    });
+  });
+  // clear table highlights
+  document.querySelectorAll('#pda-tbody tr').forEach(r=>r.classList.remove('pda-row-hl'));
+}
+
+function runPDASim(inp) {
+  const rows  = curRE===1 ? PDA_RE1 : PDA_RE2;
+  const alph  = curRE===1 ? RE1.alphabet : RE2.alphabet;
+
+  // validate alphabet
+  for(const ch of inp) {
+    if(!alph.includes(ch)) {
+      flashBadge('invalid');
+      return;
+    }
+  }
+
+  const delta = buildPdaDelta(rows);
+  // find start state label
+  const startLabel = rows[0][0]; // always q₀
+
+  let state = startLabel;
+  let stack = ['Z₀'];
+
+  const steps = [];
+  // step 0 = initial
+  steps.push({ state, sym: null, stack: [...stack], rowIdx: null });
+
+  for(const ch of inp) {
+    const key = state.replace(/\s/g,'');
+    const trans = delta[state]?.[ch];
+    if(!trans) {
+      // no transition — stuck
+      steps.push({ state: 'STUCK', sym: ch, stack: [...stack], rowIdx: null });
+      break;
+    }
+    steps.push({ state: trans.next, sym: ch, stack: [...stack], rowIdx: trans.row });
+    state = trans.next;
+  }
+
+  const finalState = steps[steps.length-1].state;
+  const accepted = isPdaAccept(finalState, curRE);
+  flashBadge(accepted ? 'valid' : 'invalid');
+
+  // switch to flowchart tab for animation
+  switchPDATab('flow');
+
+  // init animation
+  pdaSteps = steps;
+  pdaIdx = 0;
+
+  // build char pills
+  const cont = document.getElementById('pda-anim-chars');
+  cont.innerHTML = '';
+  for(let i=0;i<inp.length;i++) {
+    const p = document.createElement('div');
+    p.className='anim-char';
+    p.id='pda-ch-'+i;
+    p.textContent=inp[i];
+    cont.appendChild(p);
+  }
+  if(!inp.length) {
+    const p=document.createElement('div');
+    p.className='anim-char'; p.textContent='ε'; cont.appendChild(p);
+  }
+
+  document.getElementById('pda-anim-bar').classList.add('visible');
+  pdaGoto(0);
+}
+
+// ── PDA Edge + Node Animation (mirrors DFA flashEdge exactly) ───
+function flashPdaEdge(fromLabel, toLabel) {
+  const svg = document.getElementById('pda-svg');
+  if(!svg) return;
+  svg.querySelectorAll('.pda-edge-flash').forEach(e=>e.remove());
+
+  const key = fromLabel + '→' + toLabel;
+  const d = pdaEdgePaths[key];
+  if(!d) return;
+
+  const dur = Math.max(200, pdaDur * 0.65);
+
+  // Glow trace along the edge path
+  const glowLine = document.createElementNS('http://www.w3.org/2000/svg','path');
+  glowLine.setAttribute('d', d);
+  glowLine.setAttribute('fill','none');
+  glowLine.setAttribute('stroke','#f5a623');
+  glowLine.setAttribute('stroke-width','2.5');
+  glowLine.setAttribute('opacity','0.55');
+  glowLine.setAttribute('filter','url(#gg)'); // reuse existing glow filter
+  glowLine.classList.add('pda-edge-flash');
+  svg.appendChild(glowLine);
+
+  // Travelling dot via animateMotion
+  const tmpId = '_pda_tmp_' + Date.now();
+  const tmpPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+  tmpPath.setAttribute('id', tmpId);
+  tmpPath.setAttribute('d', d);
+  tmpPath.setAttribute('fill','none');
+  tmpPath.setAttribute('stroke','none');
+  tmpPath.classList.add('pda-edge-flash');
+  svg.appendChild(tmpPath);
+
+  const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('r','6');
+  dot.setAttribute('fill','#f5a623');
+  dot.setAttribute('filter','url(#gg)');
+  dot.classList.add('pda-edge-flash');
+
+  const anim = document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+  anim.setAttribute('dur', dur + 'ms');
+  anim.setAttribute('fill','freeze');
+  anim.setAttribute('calcMode','spline');
+  anim.setAttribute('keySplines','0.4 0 0.6 1');
+  const mpath = document.createElementNS('http://www.w3.org/2000/svg','mpath');
+  mpath.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href','#'+tmpId);
+  anim.appendChild(mpath);
+  dot.appendChild(anim);
+  svg.appendChild(dot);
+  anim.beginElement();
+
+  // Pulse ring on the destination node center
+  const toNode = pdaStateToFlowNode(toLabel);
+  const nc = toNode ? pdaNodeCenters[toNode] : null;
+  if(nc) addPdaPulseRing(svg, nc.cx, nc.cy);
+
+  setTimeout(()=>{ svg.querySelectorAll('.pda-edge-flash').forEach(e=>e.remove()); }, dur+120);
+}
+
+// Map PDA state label → flowchart nodeId (for node center lookup)
+function pdaStateToFlowNode(label) {
+  const m1 = {'q₀':'q0','q₁':'q1','q₂':'q2','q₃':'q3','q₄':'q4','q₅':'q5','qT':'reject-q1'};
+  const m2 = {'q₀':'q0','q₁':'q1','q₂':'q2','q₃':'q3','q₄':'q4','q₅':'q5','q₆':'accept'};
+  return (curRE===1 ? m1 : m2)[label] || null;
+}
+
+// Expanding pulse ring identical to DFA addPulseRing but for arbitrary (cx,cy)
+function addPdaPulseRing(svg, cx, cy) {
+  const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  ring.setAttribute('cx', cx);
+  ring.setAttribute('cy', cy);
+  ring.setAttribute('r','22');
+  ring.setAttribute('fill','none');
+  ring.setAttribute('stroke','#f5a623');
+  ring.setAttribute('stroke-width','2.5');
+  ring.setAttribute('opacity','0.8');
+  ring.classList.add('pda-edge-flash');
+  svg.appendChild(ring);
+}
+
+function pdaGoto(idx) {
+  if(!pdaSteps.length) return;
+  idx = Math.max(0, Math.min(idx, pdaSteps.length-1));
+  pdaIdx = idx;
+
+  const step = pdaSteps[idx];
+  const isLast = idx===pdaSteps.length-1;
+  const accepted = isLast && isPdaAccept(step.state, curRE);
+  const rejected = isLast && (isPdaReject(step.state, curRE) || step.state==='STUCK');
+
+  // ── animate edge from previous step to current ──────────────
+  if(idx > 0) {
+    const prevStep = pdaSteps[idx-1];
+    if(prevStep.state && step.state && prevStep.state !== 'STUCK') {
+      flashPdaEdge(prevStep.state, step.state);
+    }
+  }
+
+  // ── highlight flowchart node (same style as DFA) ────────────
+  // Remove old highlight strokes
+  document.querySelectorAll('#pda-svg [data-node]').forEach(g => {
+    g.querySelectorAll('polygon,rect').forEach(s => {
+      s.removeAttribute('data-hl');
+      if(s.dataset.origStroke) { s.setAttribute('stroke', s.dataset.origStroke); delete s.dataset.origStroke; }
+      if(s.dataset.origSw)     { s.setAttribute('stroke-width', s.dataset.origSw); delete s.dataset.origSw; }
+      s.removeAttribute('filter');
+    });
+  });
+  // Determine which node to highlight
+  let hlNodeId = pdaStateToFlowNode(step.state);
+  if(curRE===1 && isLast && accepted) hlNodeId = step.state==='q₄' ? 'accept-q4' : 'accept-q5';
+  if(curRE===1 && isLast && rejected) hlNodeId = 'reject-q1';
+  if(curRE===2 && isLast && rejected) hlNodeId = 'reject';
+  if(hlNodeId) {
+    const g = document.querySelector(`#pda-svg [data-node="${hlNodeId}"]`);
+    if(g) {
+      const hlColor = accepted ? '#3ecf6e' : rejected ? '#e85555' : '#f5a623';
+      g.querySelectorAll('polygon,rect').forEach(s => {
+        s.dataset.origStroke = s.getAttribute('stroke') || '';
+        s.dataset.origSw = s.getAttribute('stroke-width') || '';
+        s.setAttribute('stroke', hlColor);
+        s.setAttribute('stroke-width', '2.5');
+        s.setAttribute('filter', 'url(#gg)');
+      });
+    }
+  }
+
+  // ── highlight table row ───────────────────────────────────
+  document.querySelectorAll('#pda-tbody tr').forEach(r=>r.classList.remove('pda-row-hl'));
+  if(step.rowIdx !== null) {
+    const row = document.querySelector(`#pda-tbody tr[data-row="${step.rowIdx}"]`);
+    if(row) {
+      row.classList.add('pda-row-hl');
+      row.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
+
+  // ── state badge ───────────────────────────────────────────
+  const badge = document.getElementById('pda-state-badge');
+  badge.textContent = step.state;
+  badge.className = 'pda-state-badge' + (accepted?' accept': rejected?' reject':'');
+
+  // ── stack display ─────────────────────────────────────────
+  const stackCont = document.getElementById('pda-stack-cells');
+  stackCont.innerHTML='';
+  const stack = step.stack;
+  for(let i=0;i<stack.length;i++) {
+    const c=document.createElement('div');
+    c.className='pda-stack-cell'+(i===stack.length-1?' top':'');
+    c.textContent=stack[i];
+    stackCont.appendChild(c);
+  }
+
+  // ── char pills ────────────────────────────────────────────
+  const inp = pdaSteps.map(s=>s.sym).filter(Boolean);
+  for(let i=0;i<inp.length;i++) {
+    const p=document.getElementById('pda-ch-'+i);
+    if(!p) continue;
+    p.className='anim-char';
+    if(i < idx-1)      p.className='anim-char '+(isLast?(accepted?'accepted':'rejected'):'done');
+    else if(i===idx-1) p.className='anim-char active';
+  }
+
+  // ── result inline ─────────────────────────────────────────
+  const res = document.getElementById('pda-result-inline');
+  if(isLast) {
+    res.textContent = accepted ? '✓ ACCEPTED' : '✗ REJECTED';
+    res.style.color  = accepted ? 'var(--green)' : 'var(--red)';
+  } else { res.textContent=''; }
+
+  // ── step counter ──────────────────────────────────────────
+  document.getElementById('pda-anim-step-info').textContent =
+    `step ${idx} / ${pdaSteps.length-1}`;
+
+  pdaUpdateUI();
+}
+
+function pdaUpdateUI() {
+  const playBtn = document.getElementById('pda-anim-play');
+  playBtn.classList.toggle('playing', !!pdaTimer);
+  playBtn.innerHTML = pdaTimer ? '&#9646;&#9646;' : '&#9654;';
+  document.getElementById('pda-anim-prev').disabled = pdaIdx<=0;
+  document.getElementById('pda-anim-next').disabled = pdaIdx>=pdaSteps.length-1;
+}
+
+function pdaAnimStep(d) { pdaStopPlay(); pdaGoto(pdaIdx+d); }
+function pdaAnimReset() { pdaStopPlay(); pdaGoto(0); }
+function pdaAnimTogglePlay() { pdaTimer ? pdaStopPlay() : pdaStartPlay(); }
+function pdaStartPlay() {
+  if(pdaIdx>=pdaSteps.length-1) pdaIdx=0;
+  pdaTimer=setInterval(()=>{
+    if(pdaIdx>=pdaSteps.length-1){pdaStopPlay();return;}
+    pdaGoto(pdaIdx+1);
+  },pdaDur);
+  pdaUpdateUI();
+}
+function pdaStopPlay() {
+  if(pdaTimer){clearInterval(pdaTimer);pdaTimer=null;}
+  pdaUpdateUI();
 }
 
 /* ═══════════════════════════════════════════════════════
